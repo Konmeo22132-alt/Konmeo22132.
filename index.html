@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Bio</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      color: white;
+      min-height: 100vh;
+      background: url('https://cdn.discordapp.com/attachments/1352230778796507146/1360617008621682738/87cdcc98-fdcc-4ae2-86c6-45d0f6d03a0f.gif?ex=67fbc4d5&is=67fa7355&hm=f346c1a500eef46838646744e3f013a1ae15b76587404df046ab572a2884d11d&') no-repeat center center fixed;
+      background-size: cover;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .profile {
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(25px);
+      padding: 20px;
+      border-radius: 20px;
+      text-align: center;
+      width: 90%;
+      max-width: 400px;
+      box-shadow: 0 0 25px rgba(255,255,255,0.1);
+    }
+
+    .avatar {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      border: 3px solid white;
+      margin-bottom: 10px;
+    }
+
+    .decoration {
+      width: 40px;
+      height: 40px;
+      margin-top: -20px;
+      margin-bottom: 10px;
+    }
+
+    .username {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    .links a {
+      display: block;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 10px;
+      margin: 8px 0;
+      border-radius: 10px;
+      color: white;
+      text-decoration: none;
+      transition: background 0.3s;
+    }
+
+    .links a:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+  </style>
+</head>
+<body>
+  <div class="profile">
+    <img class="avatar" src="https://cdn.discordapp.com/avatars/000000000000000000/youravatar.png?size=1024" alt="Avatar" />
+    <img class="decoration" src="https://your-decoration-url.png" alt="Decoration" />
+    <div class="username">Tên người dùng của bạn</div>
+    <div class="links">
+      <a href="https://discord.com/users/123456789012345678">Discord</a>
+      <a href="https://tiktok.com/@yourname">TikTok</a>
+      <a href="https://youtube.com/@yourchannel">YouTube</a>
+    </div>
+  </div>
+</body>
+        </html>
