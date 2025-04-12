@@ -16,7 +16,7 @@
     body {
       background: url('https://cdn.discordapp.com/attachments/1352230778796507146/1360617008621682738/87cdcc98-fdcc-4ae2-86c6-45d0f6d03a0f.gif') no-repeat center center/cover;
       height: 100vh;
-      overflow: hidden;
+      overflow: auto;
     }
     .profile {
       position: absolute;
@@ -27,7 +27,7 @@
       backdrop-filter: blur(25px);
       border-radius: 20px;
       padding: 30px;
-      width: 320px;
+      width: 350px;
       text-align: center;
       color: white;
       box-shadow: 0 0 30px rgba(0,0,0,0.3);
@@ -45,9 +45,9 @@
     }
     .player {
       margin-top: 20px;
-    }
-    .track {
-      margin-bottom: 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 15px;
+      padding: 15px;
     }
     .track img {
       width: 100%;
@@ -63,6 +63,20 @@
     }
     audio {
       width: 100%;
+      margin-top: 10px;
+    }
+    button {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      font-size: 18px;
+      margin: 0 10px;
+      cursor: pointer;
+      padding: 5px 10px;
+      border-radius: 8px;
+    }
+    button:hover {
+      background: rgba(255,255,255,0.3);
     }
   </style>
 </head>
