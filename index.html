@@ -30,7 +30,7 @@
 
     .profile-container {
       position: absolute;
-      top: 6cm; /* Khoảng cách 6cm từ đầu trang mặc định */
+      top: 6cm; /* Khoảng cách 6cm từ đầu trang mặc định cho PC */
       left: 50%; /* Căn giữa theo chiều ngang */
       transform: translateX(-50%); /* Đảm bảo căn giữa hoàn toàn */
       text-align: center;
@@ -89,30 +89,30 @@
     /* Media Queries cho màn hình dọc (mobile) */
     @media (max-width: 767px) {
       .profile-container {
-        top: 3cm; /* Giảm khoảng cách từ đầu trang */
+        top: 3cm; /* Giảm khoảng cách từ đầu trang cho mobile */
       }
 
       h1 {
-        font-size: 2.5em; /* Giảm kích thước font chữ trên màn hình nhỏ */
+        font-size: 2.5em;
       }
 
       p {
-        font-size: 1em; /* Giảm kích thước font chữ mô tả */
+        font-size: 1em;
       }
     }
 
     /* Media Queries cho màn hình ngang (PC) */
     @media (min-width: 768px) {
       .profile-container {
-        top: 6cm; /* Khoảng cách 6cm từ đầu trang cho màn hình lớn */
+        top: 4cm; /* Điều chỉnh khoảng cách từ đầu trang trên PC */
       }
 
       h1 {
-        font-size: 3em; /* Giữ kích thước font chữ trên màn hình lớn */
+        font-size: 3em;
       }
 
       p {
-        font-size: 1.2em; /* Giữ kích thước font chữ mô tả */
+        font-size: 1.2em;
       }
     }
   </style>
