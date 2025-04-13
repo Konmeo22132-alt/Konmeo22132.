@@ -69,6 +69,7 @@
       backdrop-filter: blur(15px);
       -webkit-backdrop-filter: blur(15px);
       box-shadow: 0 0 30px rgba(0, 0, 0, 0.2);
+      padding: 20px;
     }
 
     .discord-icon {
@@ -99,7 +100,7 @@
 
     @media (max-width: 767px) {
       .profile-container {
-        top: 4cm; /* Cách đầu trang 4cm trên điện thoại */
+        top: 4cm;
       }
 
       h1 {
@@ -112,13 +113,12 @@
 
       .frosted-box {
         width: 90%;
-        height: 70px;
       }
     }
 
     @media (min-width: 768px) {
       .profile-container {
-        top: 2cm; /* Đã chỉnh từ 7cm xuống 2cm */
+        top: 2cm;
       }
 
       h1 {
@@ -128,10 +128,6 @@
       p {
         font-size: 1.2em;
       }
-
-      .frosted-box {
-        height: 140px;
-      }
     }
   </style>
 </head>
@@ -140,7 +136,26 @@
     <div class="avatar"></div>
     <h1>Konmeo</h1>
     <p>Chào mừng bạn đến với profile của mình!</p>
-    <div class="frosted-box"></div>
+
+    <div class="frosted-box">
+      <h3 style="margin: 10px 0;">Danh sách nhạc</h3>
+      <img id="song-image" src="https://r2.guns.lol/2dfdf0a5-519c-45e6-8cab-fb12f54cfd0d.webp" alt="Ảnh bài hát" style="width: 100%; border-radius: 15px; margin-bottom: 10px;">
+      <h4 id="song-title">Ngọt - Hướng Dương</h4>
+      <p id="song-author">Tác giả: Thắng (Ngọt)</p>
+
+      <select id="playlist" onchange="changeTrack()" style="margin: 10px 0; padding: 5px; width: 100%;">
+        <option value="0">Ngọt - Hướng Dương</option>
+        <option value="1">Trước Khi Em Tồn Tại</option>
+        <option value="2">NỨT (đôi chân đôi tay đôi mắt trái tim)</option>
+        <option value="3">Lần cuối (đi bên em xót xa người ơi)</option>
+        <option value="4">Em dạo này</option>
+      </select>
+
+      <audio id="audioPlayer" controls autoplay loop style="width: 100%;">
+        <source id="audioSource" src="https://docs.google.com/uc?export=download&id=1uh7d2EPExCb2ISfG3dRxVfz1aInHeLZX" type="audio/mpeg">
+        Trình duyệt không hỗ trợ phát nhạc.
+      </audio>
+    </div>
   </div>
 
   <div class="discord-icon" onclick="copyUsername()">
@@ -159,16 +174,57 @@
       });
     }
 
-    // Ngăn chặn cuộn trang khi ở cả chế độ màn hình dọc và ngang
     function preventScroll() {
-      document.body.style.overflow = 'hidden'; // Ngăn cuộn trên cả mobile và PC
+      document.body.style.overflow = 'hidden';
     }
 
-    // Kiểm tra thay đổi kích thước màn hình
     window.addEventListener('resize', preventScroll);
-
-    // Khởi tạo khi trang được tải
     window.onload = preventScroll;
+
+    const songs = [
+      {
+        title: "Ngọt - Hướng Dương",
+        author: "Thắng (Ngọt)",
+        image: "https://r2.guns.lol/2dfdf0a5-519c-45e6-8cab-fb12f54cfd0d.webp",
+        mp3: "1uh7d2EPExCb2ISfG3dRxVfz1aInHeLZX"
+      },
+      {
+        title: "Trước Khi Em Tồn Tại",
+        author: "Thắng (Ngọt)",
+        image: "https://r2.guns.lol/6a3449c5-5e81-43dd-8281-33b3d2f4fdb5.webp",
+        mp3: "1uW9e__wW9k73ux2WL-e0i5-13FNeDivO"
+      },
+      {
+        title: "NỨT (đôi chân đôi tay đôi mắt trái tim)",
+        author: "Ngọt",
+        image: "https://r2.guns.lol/aa420557-d9b0-4cb0-b528-da7a049325ce.webp",
+        mp3: "1uk-ntHtGF5hRaYXqzAnD6hU61q0IHluw"
+      },
+      {
+        title: "Lần cuối (đi bên em xót xa người ơi)",
+        author: "Ngọt",
+        image: "https://r2.guns.lol/453f5fa7-3ce4-4cb9-a98f-eb8ece72b84f.webp",
+        mp3: "1ujM0L1mKt4mQ1maqszdWRm2uHLo-PE55"
+      },
+      {
+        title: "Em dạo này",
+        author: "Ngọt",
+        image: "https://r2.guns.lol/4dc4ecc2-8a99-48cb-8d08-8d302566a094.webp",
+        mp3: "1uS53Ya_sBfib2xGG4juIYajfA9zNU5KF"
+      }
+    ];
+
+    function changeTrack() {
+      const index = document.getElementById("playlist").value;
+      const song = songs[index];
+      document.getElementById("audioSource").src = `https://docs.google.com/uc?export=download&id=${song.mp3}`;
+      document.getElementById("song-title").textContent = song.title;
+      document.getElementById("song-author").textContent = "Tác giả: " + song.author;
+      document.getElementById("song-image").src = song.image;
+      const player = document.getElementById("audioPlayer");
+      player.load();
+      player.play();
+    }
   </script>
 </body>
 </html>
