@@ -1,237 +1,165 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Konmeo's Profile</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: 'Segoe UI', sans-serif;
-    }
+<!DOCTYPE html>  <html lang="vi">  
+<head>  
+  <meta charset="UTF-8" />  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>  
+  <title>Konmeo's Profile</title>  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />  
+  <style>  
+    * {  
+      margin: 0;  
+      padding: 0;  
+      box-sizing: border-box;  
+      font-family: 'Segoe UI', sans-serif;  
+    }  html, body {  
+  height: 100%;  
+  color: white;  
+}  
 
-    html, body {
-      height: 100%;
-      color: white;
-    }
+body {  
+  background: url('https://r2.guns.lol/87cdcc98-fdcc-4ae2-86c6-45d0f6d03a0f.gif') no-repeat center center fixed;  
+  background-size: cover;  
+  display: flex;  
+  justify-content: center;  
+  align-items: flex-start;  
+  flex-direction: column;  
+  height: 100vh;  
+}  
 
-    body {
-      background: url('https://r2.guns.lol/87cdcc98-fdcc-4ae2-86c6-45d0f6d03a0f.gif') no-repeat center center fixed;
-      background-size: cover;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      flex-direction: column;
-      height: 100vh;
-    }
+.profile-container {  
+  position: absolute;  
+  left: 50%;  
+  transform: translateX(-50%);  
+  text-align: center;  
+  display: flex;  
+  flex-direction: column;  
+  align-items: center;  
+}  
 
-    .profile-container {
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      text-align: center;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
+.avatar {  
+  width: 150px;  
+  height: 150px;  
+  border-radius: 50%;  
+  margin-bottom: 10px;  
+  background-image: url('https://r2.guns.lol/7d8aa970-cae5-44db-aef2-800458e6e6f1.webp');  
+  background-size: cover;  
+  background-position: center;  
+}  
 
-    .avatar {
-      width: 150px;
-      height: 150px;
-      border-radius: 50%;
-      margin-bottom: 10px;
-      background-image: url('https://r2.guns.lol/7d8aa970-cae5-44db-aef2-800458e6e6f1.webp');
-      background-size: cover;
-      background-position: center;
-    }
+h1 {  
+  font-size: 3em;  
+  margin-bottom: 0.3em;  
+  text-shadow: 0 0 10px #000;  
+}  
 
-    h1 {
-      font-size: 3em;
-      margin-bottom: 0.3em;
-      text-shadow: 0 0 10px #000;
-    }
+p {  
+  font-size: 1.2em;  
+  text-shadow: 0 0 10px #000;  
+  margin-bottom: 1.5em;  
+}  
 
-    p {
-      font-size: 1.2em;
-      text-shadow: 0 0 10px #000;
-      margin-bottom: 1.5em;
-    }
+.frosted-box {  
+  margin-top: 10px;  
+  width: 80vw;  
+  max-width: 800px;  
+  border-radius: 20px;  
+  background: rgba(255, 255, 255, 0.15);  
+  backdrop-filter: blur(15px);  
+  -webkit-backdrop-filter: blur(15px);  
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.2);  
+}  
 
-    .frosted-box {
-      margin-top: 10px;
-      width: 80vw;
-      max-width: 800px;
-      border-radius: 20px;
-      background: rgba(255, 255, 255, 0.15);
-      backdrop-filter: blur(15px);
-      -webkit-backdrop-filter: blur(15px);
-      box-shadow: 0 0 30px rgba(0, 0, 0, 0.2);
-      padding: 20px;
-    }
+.discord-icon {  
+  position: fixed;  
+  bottom: 20px;  
+  right: 20px;  
+  font-size: 2em;  
+  cursor: pointer;  
+  color: #7289da;  
+  transition: transform 0.2s ease;  
+}  
 
-    .discord-icon {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      font-size: 2em;
-      cursor: pointer;
-      color: #7289da;
-      transition: transform 0.2s ease;
-    }
+.discord-icon:hover {  
+  transform: scale(1.1);  
+}  
 
-    .discord-icon:hover {
-      transform: scale(1.1);
-    }
+.toast {  
+  position: fixed;  
+  bottom: 30px;  
+  left: 30px;  
+  background: rgba(0, 0, 0, 0.7);  
+  padding: 10px 20px;  
+  border-radius: 10px;  
+  font-size: 1em;  
+  display: none;  
+  color: white;  
+}  
 
-    .toast {
-      position: fixed;
-      bottom: 30px;
-      left: 30px;
-      background: rgba(0, 0, 0, 0.7);
-      padding: 10px 20px;
-      border-radius: 10px;
-      font-size: 1em;
-      display: none;
-      color: white;
-    }
+@media (max-width: 767px) {  
+  .profile-container {  
+    top: 4cm; /* Cách đầu trang 4cm trên điện thoại */  
+  }  
 
-    @media (max-width: 767px) {
-      .profile-container {
-        top: 4cm;
-      }
+  h1 {  
+    font-size: 2.2em;  
+  }  
 
-      h1 {
-        font-size: 2.2em;
-      }
+  p {  
+    font-size: 1em;  
+  }  
 
-      p {
-        font-size: 1em;
-      }
+  .frosted-box {  
+    width: 90%;  
+    height: 70px;  
+  }  
+}  
 
-      .frosted-box {
-        width: 90%;
-      }
-    }
+@media (min-width: 768px) {  
+  .profile-container {  
+    top: 2cm; /* Đã chỉnh từ 7cm xuống 2cm */  
+  }  
 
-    @media (min-width: 768px) {
-      .profile-container {
-        top: 2cm;
-      }
+  h1 {  
+    font-size: 3em;  
+  }  
 
-      h1 {
-        font-size: 3em;
-      }
+  p {  
+    font-size: 1.2em;  
+  }  
 
-      p {
-        font-size: 1.2em;
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="profile-container">
-    <div class="avatar"></div>
-    <h1>Konmeo</h1>
-    <p>Chào mừng bạn đến với profile của mình!</p>
+  .frosted-box {  
+    height: 140px;  
+  }  
+}
 
-    <div class="frosted-box">
-      <h3 style="margin: 10px 0;">Danh sách nhạc</h3>
-      <!-- Giảm kích thước hình ảnh xuống 1/16 -->
-      <img id="song-image" src="https://r2.guns.lol/2dfdf0a5-519c-45e6-8cab-fb12f54cfd0d.webp" alt="Ảnh bài hát" style="width: 6.25%; border-radius: 15px; margin-bottom: 10px;">
-      <h4 id="song-title">Ngọt - Hướng Dương</h4>
-      <p id="song-author">Tác giả: Thắng (Ngọt)</p>
-
-      <select id="playlist" onchange="changeTrack()" style="margin: 10px 0; padding: 5px; width: 100%;">
-        <option value="0">Ngọt - Hướng Dương</option>
-        <option value="1">Trước Khi Em Tồn Tại</option>
-        <option value="2">NỨT (đôi chân đôi tay đôi mắt trái tim)</option>
-        <option value="3">Lần cuối (đi bên em xót xa người ơi)</option>
-        <option value="4">Em dạo này</option>
-      </select>
-
-      <!-- Không có thuộc tính autoplay ở đây -->
-      <audio id="audioPlayer" controls loop style="width: 100%;">
-        <source id="audioSource" src="https://docs.google.com/uc?export=download&id=1uh7d2EPExCb2ISfG3dRxVfz1aInHeLZX" type="audio/mpeg">
-        Trình duyệt không hỗ trợ phát nhạc.
-      </audio>
-
-      <!-- Nút Play -->
-      <button id="playButton" onclick="playAudio()" style="margin-top: 10px; padding: 10px 20px; background-color: #7289da; color: white; border: none; border-radius: 5px; cursor: pointer;">Phát nhạc</button>
-    </div>
-  </div>
-
-  <div class="discord-icon" onclick="copyUsername()">
-    <i class="fab fa-discord"></i>
-  </div>
-
-  <div class="toast" id="toast">Đã copy username vào clipboard!</div>
-
-  <script>
-    function copyUsername() {
-      const username = "@Konmeo22132";
-      navigator.clipboard.writeText(username).then(() => {
-        const toast = document.getElementById('toast');
-        toast.style.display = 'block';
-        setTimeout(() => toast.style.display = 'none', 2000);
-      });
-    }
-
-    function preventScroll() {
-      document.body.style.overflow = 'hidden';
-    }
-
-    window.addEventListener('resize', preventScroll);
-    window.onload = preventScroll;
-
-    const songs = [
-      {
-        title: "Ngọt - Hướng Dương",
-        author: "Thắng (Ngọt)",
-        image: "https://r2.guns.lol/2dfdf0a5-519c-45e6-8cab-fb12f54cfd0d.webp",
-        mp3: "1uh7d2EPExCb2ISfG3dRxVfz1aInHeLZX"
-      },
-      {
-        title: "Trước Khi Em Tồn Tại",
-        author: "Thắng (Ngọt)",
-        image: "https://r2.guns.lol/6a3449c5-5e81-43dd-8281-33b3d2f4fdb5.webp",
-        mp3: "1uW9e__wW9k73ux2WL-e0i5-13FNeDivO"
-      },
-      {
-        title: "NỨT (đôi chân đôi tay đôi mắt trái tim)",
-        author: "Ngọt",
-        image: "https://r2.guns.lol/aa420557-d9b0-4cb0-b528-da7a049325ce.webp",
-        mp3: "1uk-ntHtGF5hRaYXqzAnD6hU61q0IHluw"
-      },
-      {
-        title: "Lần cuối (đi bên em xót xa người ơi)",
-        author: "Ngọt",
-        image: "https://r2.guns.lol/453f5fa7-3ce4-4cb9-a98f-eb8ece72b84f.webp",
-        mp3: "1ujM0L1mKt4mQ1maqszdWRm2uHLo-PE55"
-      },
-      {
-        title: "Em dạo này",
-        author: "Ngọt",
-        image: "https://r2.guns.lol/4dc4ecc2-8a99-48cb-8d08-8d302566a094.webp",
-        mp3: "1uS53Ya_sBfib2xGG4juIYajfA9zNU5KF"
-      }
-    ];
-
-    function changeTrack() {
-      const index = document.getElementById("playlist").value;
-      const song = songs[index];
-      document.getElementById("audioSource").src = `https://docs.google.com/uc?export=download&id=${song.mp3}`;
-      document.getElementById("song-title").textContent = song.title;
-      document.getElementById("song-author").textContent = "Tác giả: " + song.author;
-      document.getElementById("song-image").src = song.image;
-    }
-
-    function playAudio() {
-      const player = document.getElementById("audioPlayer");
-      player.play();
-    }
-  </script>
-</body>
+  </style>  
+</head>  
+<body>  
+  <div class="profile-container">  
+    <div class="avatar"></div>  
+    <h1>Konmeo</h1>  
+    <p>Chào mừng bạn đến với profile của mình!</p>  
+    <div class="frosted-box"></div>  
+  </div>    <div class="discord-icon" onclick="copyUsername()">  
+    <i class="fab fa-discord"></i>  
+  </div>    <div class="toast" id="toast">Đã copy username vào clipboard!</div>    <script>  
+    function copyUsername() {  
+      const username = "@Konmeo22132";  
+      navigator.clipboard.writeText(username).then(() => {  
+        const toast = document.getElementById('toast');  
+        toast.style.display = 'block';  
+        setTimeout(() => toast.style.display = 'none', 2000);  
+      });  
+    }  
+  
+    // Ngăn chặn cuộn trang khi ở cả chế độ màn hình dọc và ngang  
+    function preventScroll() {  
+      document.body.style.overflow = 'hidden'; // Ngăn cuộn trên cả mobile và PC  
+    }  
+  
+    // Kiểm tra thay đổi kích thước màn hình  
+    window.addEventListener('resize', preventScroll);  
+  
+    // Khởi tạo khi trang được tải  
+    window.onload = preventScroll;  
+  </script>  </body>  
 </html>
