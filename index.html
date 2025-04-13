@@ -22,11 +22,15 @@
       background: url('https://r2.guns.lol/87cdcc98-fdcc-4ae2-86c6-45d0f6d03a0f.gif') no-repeat center center fixed;
       background-size: cover;
       display: flex;
-      align-items: flex-start; /* Căn phần tử lên trên */
+      align-items: center; /* Căn giữa theo chiều dọc */
       justify-content: center;
       flex-direction: column;
       text-align: center;
-      padding-top: 40%; /* Đưa nội dung lên gần đầu hơn */
+    }
+
+    .profile-container {
+      margin-top: -40%; /* Đẩy nội dung lên 40% */
+      text-align: center;
     }
 
     .avatar {
@@ -78,9 +82,11 @@
   </style>
 </head>
 <body>
-  <div class="avatar"></div>
-  <h1>Konmeo</h1>
-  <p>Chào mừng bạn đến với profile của mình!</p>
+  <div class="profile-container">
+    <div class="avatar"></div>
+    <h1>Konmeo</h1>
+    <p>Chào mừng bạn đến với profile của mình!</p>
+  </div>
 
   <div class="discord-icon" onclick="copyUsername()">
     <i class="fab fa-discord"></i>
