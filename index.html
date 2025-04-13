@@ -156,6 +156,9 @@
         <source id="audioSource" src="https://docs.google.com/uc?export=download&id=1uh7d2EPExCb2ISfG3dRxVfz1aInHeLZX" type="audio/mpeg">
         Trình duyệt không hỗ trợ phát nhạc.
       </audio>
+
+      <!-- Nút Play -->
+      <button id="playButton" onclick="playAudio()" style="margin-top: 10px; padding: 10px 20px; background-color: #7289da; color: white; border: none; border-radius: 5px; cursor: pointer;">Phát nhạc</button>
     </div>
   </div>
 
@@ -222,8 +225,10 @@
       document.getElementById("song-title").textContent = song.title;
       document.getElementById("song-author").textContent = "Tác giả: " + song.author;
       document.getElementById("song-image").src = song.image;
+    }
+
+    function playAudio() {
       const player = document.getElementById("audioPlayer");
-      player.load();
       player.play();
     }
   </script>
