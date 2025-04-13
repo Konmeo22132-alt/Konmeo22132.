@@ -159,13 +159,9 @@
       });
     }
 
-    // Ngăn chặn cuộn trang khi ở chế độ màn hình ngang
+    // Ngăn chặn cuộn trang khi ở cả chế độ màn hình dọc và ngang
     function preventScroll() {
-      if (window.innerWidth > window.innerHeight) {
-        document.body.style.overflow = 'hidden';
-      } else {
-        document.body.style.overflow = 'auto';
-      }
+      document.body.style.overflow = 'hidden'; // Ngăn cuộn trên cả mobile và PC
     }
 
     // Kiểm tra thay đổi kích thước màn hình
