@@ -25,17 +25,15 @@
       justify-content: center; /* Căn giữa theo chiều ngang */
       align-items: flex-start; /* Căn phần tử lên trên */
       flex-direction: column;
-      text-align: center;
-      height: 100vh;
+      height: 100vh; /* Đảm bảo chiều cao của body 100% */
     }
 
     .profile-container {
-      position: relative;
-      top: 4vh; /* Đưa nội dung lên cách đầu 4% chiều cao của viewport */
+      position: absolute;
+      top: 6cm; /* Khoảng cách 6cm từ đầu trang */
+      left: 50%; /* Căn giữa theo chiều ngang */
+      transform: translateX(-50%); /* Đảm bảo căn giữa hoàn toàn */
       text-align: center;
-      display: flex;
-      flex-direction: column;
-      align-items: center; /* Căn giữa nội dung theo chiều ngang */
     }
 
     .avatar {
