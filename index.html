@@ -69,6 +69,42 @@
       backdrop-filter: blur(15px);
       -webkit-backdrop-filter: blur(15px);
       box-shadow: 0 0 30px rgba(0, 0, 0, 0.2);
+      padding: 20px;
+    }
+
+    .audio-player {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 15px;
+    }
+
+    .audio-player button {
+      background-color: transparent;
+      border: none;
+      color: white;
+      font-size: 1.5em;
+      cursor: pointer;
+    }
+
+    .audio-player button:focus {
+      outline: none;
+    }
+
+    .audio-progress {
+      width: 80%;
+      margin-top: 10px;
+      height: 10px;
+      background-color: #444;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .audio-progress span {
+      display: block;
+      height: 100%;
+      background-color: #7289da;
+      border-radius: 5px;
     }
 
     .discord-icon {
@@ -99,7 +135,7 @@
 
     @media (max-width: 767px) {
       .profile-container {
-        top: 4cm; /* Cách đầu trang 4cm trên điện thoại */
+        top: 4cm;
       }
 
       h1 {
@@ -118,7 +154,7 @@
 
     @media (min-width: 768px) {
       .profile-container {
-        top: 2cm; /* Đã chỉnh từ 7cm xuống 2cm */
+        top: 2cm;
       }
 
       h1 {
@@ -140,7 +176,16 @@
     <div class="avatar"></div>
     <h1>Konmeo</h1>
     <p>Chào mừng bạn đến với profile của mình!</p>
-    <div class="frosted-box"></div>
+    <div class="frosted-box">
+      <div class="audio-player">
+        <button id="prev-btn">⏮️</button>
+        <button id="play-pause-btn">▶️</button>
+        <button id="next-btn">⏭️</button>
+      </div>
+      <div class="audio-progress" id="progress">
+        <span id="progress-bar"></span>
+      </div>
+    </div>
   </div>
 
   <div class="discord-icon" onclick="copyUsername()">
@@ -149,7 +194,52 @@
 
   <div class="toast" id="toast">Đã copy username vào clipboard!</div>
 
+  <audio id="audio-player" loop>
+    <source src="https://on.soundcloud.com/t6kXSAcRhPcLaiT16" type="audio/mp3">
+    Your browser does not support the audio element.
+  </audio>
+
   <script>
+    let isPlaying = false;
+    const audioPlayer = document.getElementById('audio-player');
+    const playPauseBtn = document.getElementById('play-pause-btn');
+    const progressBar = document.getElementById('progress-bar');
+    const progressContainer = document.getElementById('progress');
+
+    playPauseBtn.addEventListener('click', togglePlayPause);
+
+    audioPlayer.addEventListener('timeupdate', updateProgressBar);
+    audioPlayer.addEventListener('ended', onTrackEnded);
+
+    function togglePlayPause() {
+      if (isPlaying) {
+        audioPlayer.pause();
+        playPauseBtn.textContent = "▶️";
+      } else {
+        audioPlayer.play();
+        playPauseBtn.textContent = "⏸️";
+      }
+      isPlaying = !isPlaying;
+    }
+
+    function updateProgressBar() {
+      const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+      progressBar.style.width = progress + '%';
+    }
+
+    function onTrackEnded() {
+      playPauseBtn.textContent = "▶️";
+      isPlaying = false;
+    }
+
+    progressContainer.addEventListener('click', (event) => {
+      const clickPosition = event.offsetX;
+      const progressWidth = progressContainer.offsetWidth;
+      const newTime = (clickPosition / progressWidth) * audioPlayer.duration;
+      audioPlayer.currentTime = newTime;
+    });
+
+    // Discord copy username functionality
     function copyUsername() {
       const username = "@Konmeo22132";
       navigator.clipboard.writeText(username).then(() => {
@@ -158,17 +248,6 @@
         setTimeout(() => toast.style.display = 'none', 2000);
       });
     }
-
-    // Ngăn chặn cuộn trang khi ở cả chế độ màn hình dọc và ngang
-    function preventScroll() {
-      document.body.style.overflow = 'hidden'; // Ngăn cuộn trên cả mobile và PC
-    }
-
-    // Kiểm tra thay đổi kích thước màn hình
-    window.addEventListener('resize', preventScroll);
-
-    // Khởi tạo khi trang được tải
-    window.onload = preventScroll;
   </script>
 </body>
 </html>
