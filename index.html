@@ -1,158 +1,80 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html><html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>guns.lol-style Profile</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Konmeo's Profile</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
-      font-family: 'Inter', sans-serif;
-    }
-    body {
-      background: url('https://cdn.discordapp.com/attachments/1352230778796507146/1360617008621682738/87cdcc98-fdcc-4ae2-86c6-45d0f6d03a0f.gif') no-repeat center center/cover;
-      height: 100vh;
-      overflow: auto;
-    }
-    .profile {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(255, 255, 255, 0.15);
-      backdrop-filter: blur(25px);
-      border-radius: 20px;
-      padding: 30px;
-      width: 350px;
-      text-align: center;
-      color: white;
-      box-shadow: 0 0 30px rgba(0,0,0,0.3);
-    }
-    .avatar {
-      width: 100px;
-      height: 100px;
-      border-radius: 50%;
-      margin-bottom: 15px;
-      border: 2px solid white;
-    }
-    h2 {
-      font-size: 20px;
-      margin-bottom: 10px;
-    }
-    .player {
-      margin-top: 20px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 15px;
-      padding: 15px;
-    }
-    .track img {
-      width: 100%;
-      border-radius: 10px;
-      margin-bottom: 10px;
-    }
-    .track h3 {
-      font-size: 16px;
-    }
-    .track p {
-      font-size: 13px;
-      color: #ccc;
-    }
-    audio {
-      width: 100%;
-      margin-top: 10px;
-    }
-    button {
-      background: rgba(255,255,255,0.2);
-      border: none;
-      color: white;
-      font-size: 18px;
-      margin: 0 10px;
-      cursor: pointer;
-      padding: 5px 10px;
-      border-radius: 8px;
-    }
-    button:hover {
-      background: rgba(255,255,255,0.3);
-    }
+      font-family: 'Segoe UI', sans-serif;
+    }body, html {
+  height: 100%;
+  color: white;
+}
+
+body {
+  background: url('https://cdn.discordapp.com/attachments/1352230778796507146/1360617008621682738/87cdcc98-fdcc-4ae2-86c6-45d0f6d03a0f.gif') no-repeat center center fixed;
+  background-size: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  text-align: center;
+}
+
+h1 {
+  font-size: 3em;
+  margin-bottom: 0.3em;
+  text-shadow: 0 0 10px #000;
+}
+
+p {
+  font-size: 1.2em;
+  text-shadow: 0 0 10px #000;
+}
+
+.discord-icon {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  font-size: 2em;
+  cursor: pointer;
+  color: #7289da;
+  transition: transform 0.2s ease;
+}
+
+.discord-icon:hover {
+  transform: scale(1.1);
+}
+
+.toast {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 1em;
+  display: none;
+  color: white;
+}
+
   </style>
 </head>
-<body>
-  <div class="profile">
-    <img class="avatar" src="https://cdn.discordapp.com/avatars/887855290479935578/a_0bd76351f33c4eeedf799b368390b93c.gif" alt="Avatar" />
-    <h2>@yourusername</h2><div class="player" id="player">
-  <!-- Music will be rendered here by JS -->
-</div>
-
-  </div>  <script>
-    const tracks = [
-      {
-        title: 'Ngọt - Em dạo này',
-        author: 'Ngọt',
-        image: 'https://cdn.discordapp.com/attachments/1354404191099162746/1360624389393223760/fd29480a6ae350d4d8de51c066356761.640x640x1.jpg',
-        audio: 'https://cdn.discordapp.com/attachments/1354404191099162746/1360624434452369619/Ngot_-_Em_dao_nay_Official_Music_Video.mp3'
-      },
-      {
-        title: 'Ngọt - LẦN CUỐI ( đi bên em xót xa người ơi )',
-        author: 'Ngọt',
-        image: 'https://cdn.discordapp.com/attachments/1354404191099162746/1360625310344937836/artworks-000605743393-0030j2-t500x500.jpg',
-        audio: 'https://cdn.discordapp.com/attachments/1354404191099162746/1360625350987481171/Ngot_-_LAN_CUOI_i_ben_em_xot_xa_nguoi_oi.mp3'
-      },
-      {
-        title: 'Ngọt - NỨT (đôi tay đôi chân đôi mắt trái tim)',
-        author: 'Ngọt',
-        image: 'https://cdn.discordapp.com/attachments/1354404191099162746/1360625365621407946/artworks-f9OSlTL6sSzwZIAU-BaZVIQ-t500x500.jpg',
-        audio: 'https://cdn.discordapp.com/attachments/1354404191099162746/1360625437684006963/Ngot_-_NUT_oi_chan_oi_tay_oi_mat_trai_tim.mp3'
-      },
-      {
-        title: 'Trước Khi Em Tồn Tại',
-        author: 'Thắng (Ngọt)',
-        image: 'https://cdn.discordapp.com/attachments/1354404191099162746/1360625452821123173/IMG_20250412_213643.jpg',
-        audio: 'https://cdn.discordapp.com/attachments/1354404191099162746/1360625493644411160/Truoc_Khi_Em_Ton_Tai.mp3'
-      },
-      {
-        title: 'Thắng - Hướng Dương',
-        author: 'Thắng (Ngọt)',
-        image: 'https://cdn.discordapp.com/attachments/1354404191099162746/1360625507351269497/IMG_20250412_213702.jpg',
-        audio: 'https://cdn.discordapp.com/attachments/1354404191099162746/1360625528478109716/Thang_-_Huong_Duong_Official_Audio.mp3'
-      }
-    ];
-
-    let current = 0;
-
-    const player = document.getElementById('player');
-
-    function renderTrack(index) {
-      const track = tracks[index];
-      player.innerHTML = `
-        <div class="track">
-          <img src="${track.image}" alt="Track Art">
-          <h3>${track.title}</h3>
-          <p>${track.author}</p>
-          <audio id="audio" controls autoplay>
-            <source src="${track.audio}" type="audio/mpeg">
-          </audio>
-          <div style="margin-top:10px">
-            <button onclick="prevTrack()">◀</button>
-            <button onclick="nextTrack()">▶</button>
-          </div>
-        </div>
-      `;
+<body>  <h1>Konmeo</h1>
+  <p>Chào mừng bạn đến với profile của mình!</p>  <div class="discord-icon" onclick="copyUsername()">
+    <i class="fab fa-discord"></i>
+  </div>  <div class="toast" id="toast">Đã copy username vào clipboard!</div>  <script>
+    function copyUsername() {
+      const username = "@Konmeo22132";
+      navigator.clipboard.writeText(username).then(() => {
+        const toast = document.getElementById('toast');
+        toast.style.display = 'block';
+        setTimeout(() => toast.style.display = 'none', 2000);
+      });
     }
-
-    function nextTrack() {
-      current = (current + 1) % tracks.length;
-      renderTrack(current);
-    }
-
-    function prevTrack() {
-      current = (current - 1 + tracks.length) % tracks.length;
-      renderTrack(current);
-    }
-
-    renderTrack(current);
   </script></body>
 </html>
