@@ -158,6 +158,21 @@
         setTimeout(() => toast.style.display = 'none', 2000);
       });
     }
+
+    // Ngăn chặn cuộn trang khi ở chế độ màn hình ngang
+    function preventScroll() {
+      if (window.innerWidth > window.innerHeight) {
+        document.body.style.overflow = 'hidden';
+      } else {
+        document.body.style.overflow = 'auto';
+      }
+    }
+
+    // Kiểm tra thay đổi kích thước màn hình
+    window.addEventListener('resize', preventScroll);
+
+    // Khởi tạo khi trang được tải
+    window.onload = preventScroll;
   </script>
 </body>
 </html>
