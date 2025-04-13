@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="vi">
+<!DOCTYPE html>
+<html lang="vi">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,71 +11,81 @@
       padding: 0;
       box-sizing: border-box;
       font-family: 'Segoe UI', sans-serif;
-    }body, html {
-  height: 100%;
-  color: white;
-}
+    }
 
-body {
-  background: url('https://cdn.discordapp.com/attachments/1352230778796507146/1360617008621682738/87cdcc98-fdcc-4ae2-86c6-45d0f6d03a0f.gif') no-repeat center center fixed;
-  background-size: cover;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  text-align: center;
-}
+    body, html {
+      height: 100%;
+      color: white;
+    }
 
-h1 {
-  font-size: 3em;
-  margin-bottom: 0.3em;
-  text-shadow: 0 0 10px #000;
-}
+    body {
+      background: url('background.gif') no-repeat center center fixed;
+      background-size: cover;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      text-align: center;
+    }
 
-p {
-  font-size: 1.2em;
-  text-shadow: 0 0 10px #000;
-}
+    h1 {
+      font-size: 3em;
+      margin-bottom: 0.3em;
+      text-shadow: 0 0 10px #000;
+    }
 
-.discord-icon {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  font-size: 2em;
-  cursor: pointer;
-  color: #7289da;
-  transition: transform 0.2s ease;
-}
+    p {
+      font-size: 1.2em;
+      text-shadow: 0 0 10px #000;
+    }
 
-.discord-icon:hover {
-  transform: scale(1.1);
-}
+    .discord-icon {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      font-size: 2em;
+      cursor: pointer;
+      color: #7289da;
+      transition: transform 0.2s ease;
+    }
 
-.toast {
-  position: fixed;
-  bottom: 30px;
-  right: 30px;
-  background: rgba(0, 0, 0, 0.7);
-  padding: 10px 20px;
-  border-radius: 10px;
-  font-size: 1em;
-  display: none;
-  color: white;
-}
+    .discord-icon:hover {
+      transform: scale(1.1);
+    }
 
+    .toast {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 1em;
+      display: none;
+      color: white;
+    }
   </style>
 </head>
-<body>  <h1>Konmeo</h1>
-  <p>Chào mừng bạn đến với profile của mình!</p>  <div class="discord-icon" onclick="copyUsername()">
+<body>
+
+  <h1>Konmeo</h1>
+  <p>Chào mừng bạn đến với profile của mình!</p>
+
+  <div class="discord-icon" onclick="copyUsername()">
     <i class="fab fa-discord"></i>
-  </div>  <div class="toast" id="toast">Đã copy username vào clipboard!</div>  <script>
+  </div>
+
+  <div class="toast" id="toast">Đã copy username vào clipboard!</div>
+
+  <script>
     function copyUsername() {
-      const username = "@Konmeo22132";
+      const username = \"@Konmeo22132\";
       navigator.clipboard.writeText(username).then(() => {
         const toast = document.getElementById('toast');
         toast.style.display = 'block';
         setTimeout(() => toast.style.display = 'none', 2000);
       });
     }
-  </script></body>
+  </script>
+</body>
 </html>
