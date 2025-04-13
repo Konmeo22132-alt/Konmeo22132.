@@ -30,10 +30,13 @@
 
     .profile-container {
       position: absolute;
-      top: 6cm; /* Khoảng cách 6cm từ đầu trang */
+      top: 6cm; /* Khoảng cách 6cm từ đầu trang mặc định */
       left: 50%; /* Căn giữa theo chiều ngang */
       transform: translateX(-50%); /* Đảm bảo căn giữa hoàn toàn */
       text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center; /* Căn avatar, tên và giới thiệu theo chiều ngang */
     }
 
     .avatar {
@@ -81,6 +84,36 @@
       font-size: 1em;
       display: none;
       color: white;
+    }
+
+    /* Media Queries cho màn hình dọc (mobile) */
+    @media (max-width: 767px) {
+      .profile-container {
+        top: 3cm; /* Giảm khoảng cách từ đầu trang */
+      }
+
+      h1 {
+        font-size: 2.5em; /* Giảm kích thước font chữ trên màn hình nhỏ */
+      }
+
+      p {
+        font-size: 1em; /* Giảm kích thước font chữ mô tả */
+      }
+    }
+
+    /* Media Queries cho màn hình ngang (PC) */
+    @media (min-width: 768px) {
+      .profile-container {
+        top: 6cm; /* Khoảng cách 6cm từ đầu trang cho màn hình lớn */
+      }
+
+      h1 {
+        font-size: 3em; /* Giữ kích thước font chữ trên màn hình lớn */
+      }
+
+      p {
+        font-size: 1.2em; /* Giữ kích thước font chữ mô tả */
+      }
     }
   </style>
 </head>
