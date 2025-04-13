@@ -70,51 +70,6 @@ p {
   padding: 20px;
 }
 
-.player {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  flex-wrap: wrap;
-}
-
-.cover {
-  width: 80px;
-  height: 80px;
-  border-radius: 10px;
-  background-size: cover;
-  background-position: center;
-}
-
-.info {
-  flex: 1;
-}
-
-.title {
-  font-weight: bold;
-  font-size: 1.2em;
-}
-
-.author {
-  font-size: 0.9em;
-  opacity: 0.8;
-}
-
-.controls {
-  display: flex;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.controls i {
-  cursor: pointer;
-  font-size: 1.5em;
-}
-
-.progress {
-  width: 100%;
-  margin-top: 10px;
-}
-
 .discord-icon {
   position: fixed;
   bottom: 20px;
@@ -141,6 +96,41 @@ p {
   color: white;
 }
 
+.music-info img {
+  width: 80px;
+  height: 80px;
+  border-radius: 10px;
+  margin-right: 15px;
+}
+
+.music-info {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 10px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.progress-bar-inner {
+  height: 100%;
+  width: 0%;
+  background: white;
+  transition: width 0.2s;
+}
+
 @media (max-width: 767px) {
   .profile-container {
     top: 4cm;
@@ -154,6 +144,9 @@ p {
   .profile-container {
     top: 2cm;
   }
+  .frosted-box {
+    height: auto;
+  }
 }
 
   </style>
@@ -164,111 +157,107 @@ p {
     <h1>Konmeo</h1>
     <p>Chào mừng bạn đến với profile của mình!</p>
     <div class="frosted-box">
-      <div class="player">
-        <div class="cover" id="cover"></div>
-        <div class="info">
-          <div class="title" id="title"></div>
-          <div class="author" id="author"></div>
-          <div class="controls">
-            <i class="fas fa-backward" onclick="prevTrack()"></i>
-            <i class="fas fa-play" id="playPause" onclick="togglePlay()"></i>
-            <i class="fas fa-forward" onclick="nextTrack()"></i>
-            <i class="fas fa-redo" onclick="restartTrack()"></i>
-          </div>
-          <input type="range" id="progress" class="progress" value="0" min="0" max="100" step="1">
+      <div class="music-info">
+        <img id="cover" src="" alt="cover">
+        <div>
+          <strong id="title">Tên bài</strong><br>
+          <span id="artist">Tác giả</span>
         </div>
       </div>
+      <div class="controls">
+        <button onclick="prevSong()"><i class="fas fa-backward"></i></button>
+        <button onclick="togglePlay()" id="playBtn"><i class="fas fa-play"></i></button>
+        <button onclick="nextSong()"><i class="fas fa-forward"></i></button>
+        <button onclick="repeatSong()"><i class="fas fa-redo"></i></button>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-bar-inner" id="progress"></div>
+      </div>
+      <audio id="audio" ontimeupdate="updateProgress()" onended="nextSong()"></audio>
     </div>
   </div>  <div class="discord-icon" onclick="copyUsername()">
     <i class="fab fa-discord"></i>
-  </div>
-  <div class="toast" id="toast">Đã copy username vào clipboard!</div>  <script>
+  </div>  <div class="toast" id="toast">Đã copy username vào clipboard!</div>  <script>
     const playlist = [
       {
         title: "Ngọt - Hướng Dương",
-        author: "Thắng (Ngọt)",
+        artist: "Thắng (Ngọt)",
         cover: "https://r2.guns.lol/2dfdf0a5-519c-45e6-8cab-fb12f54cfd0d.webp",
-        url: "https://docs.google.com/uc?export=download&id=1uh7d2EPExCb2ISfG3dRxVfz1aInHeLZX"
+        src: "https://drive.google.com/uc?export=download&id=1uh7d2EPExCb2ISfG3dRxVfz1aInHeLZX"
       },
       {
         title: "Trước Khi Em Tồn Tại",
-        author: "Thắng (Ngọt)",
+        artist: "Thắng (Ngọt)",
         cover: "https://r2.guns.lol/6a3449c5-5e81-43dd-8281-33b3d2f4fdb5.webp",
-        url: "https://docs.google.com/uc?export=download&id=1uW9e__wW9k73ux2WL-e0i5-13FNeDivO"
+        src: "https://drive.google.com/uc?export=download&id=1uW9e__wW9k73ux2WL-e0i5-13FNeDivO"
       },
       {
-        title: "NỨT (đôi chân đôi tay đôi mắt trái tim)",
-        author: "Ngọt",
+        title: "NỨT",
+        artist: "Ngọt",
         cover: "https://r2.guns.lol/aa420557-d9b0-4cb0-b528-da7a049325ce.webp",
-        url: "https://docs.google.com/uc?export=download&id=1uk-ntHtGF5hRaYXqzAnD6hU61q0IHluw"
+        src: "https://drive.google.com/uc?export=download&id=1uk-ntHtGF5hRaYXqzAnD6hU61q0IHluw"
       },
       {
-        title: "Lần cuối (đi bên em xót xa người ơi)",
-        author: "Ngọt",
+        title: "Lần cuối",
+        artist: "Ngọt",
         cover: "https://r2.guns.lol/453f5fa7-3ce4-4cb9-a98f-eb8ece72b84f.webp",
-        url: "https://docs.google.com/uc?export=download&id=1ujM0L1mKt4mQ1maqszdWRm2uHLo-PE55"
+        src: "https://drive.google.com/uc?export=download&id=1ujM0L1mKt4mQ1maqszdWRm2uHLo-PE55"
       },
       {
         title: "Em dạo này",
-        author: "Ngọt",
+        artist: "Ngọt",
         cover: "https://r2.guns.lol/4dc4ecc2-8a99-48cb-8d08-8d302566a094.webp",
-        url: "https://docs.google.com/uc?export=download&id=1uS53Ya_sBfib2xGG4juIYajfA9zNU5KF"
+        src: "https://drive.google.com/uc?export=download&id=1uS53Ya_sBfib2xGG4juIYajfA9zNU5KF"
       }
     ];
 
     let current = 0;
-    const audio = new Audio();
-    const playBtn = document.getElementById("playPause");
-    const title = document.getElementById("title");
-    const author = document.getElementById("author");
-    const cover = document.getElementById("cover");
-    const progress = document.getElementById("progress");
+    const audio = document.getElementById('audio');
+    const title = document.getElementById('title');
+    const artist = document.getElementById('artist');
+    const cover = document.getElementById('cover');
+    const progress = document.getElementById('progress');
+    const playBtn = document.getElementById('playBtn');
 
-    function loadTrack(index) {
-      const track = playlist[index];
-      audio.src = track.url;
-      title.textContent = track.title;
-      author.textContent = track.author;
-      cover.style.backgroundImage = `url(${track.cover})`;
+    function loadSong(index) {
+      const song = playlist[index];
+      title.textContent = song.title;
+      artist.textContent = song.artist;
+      cover.src = song.cover;
+      audio.src = song.src;
+      audio.play();
+      playBtn.innerHTML = '<i class="fas fa-pause"></i>';
     }
 
     function togglePlay() {
       if (audio.paused) {
         audio.play();
-        playBtn.classList.remove("fa-play");
-        playBtn.classList.add("fa-pause");
+        playBtn.innerHTML = '<i class="fas fa-pause"></i>';
       } else {
         audio.pause();
-        playBtn.classList.remove("fa-pause");
-        playBtn.classList.add("fa-play");
+        playBtn.innerHTML = '<i class="fas fa-play"></i>';
       }
     }
 
-    function nextTrack() {
+    function nextSong() {
       current = (current + 1) % playlist.length;
-      loadTrack(current);
-      audio.play();
+      loadSong(current);
     }
 
-    function prevTrack() {
+    function prevSong() {
       current = (current - 1 + playlist.length) % playlist.length;
-      loadTrack(current);
+      loadSong(current);
+    }
+
+    function repeatSong() {
+      audio.currentTime = 0;
       audio.play();
     }
 
-    function restartTrack() {
-      audio.currentTime = 0;
+    function updateProgress() {
+      const percent = (audio.currentTime / audio.duration) * 100;
+      progress.style.width = percent + '%';
     }
-
-    audio.ontimeupdate = () => {
-      progress.value = (audio.currentTime / audio.duration) * 100;
-    };
-
-    progress.oninput = () => {
-      audio.currentTime = (progress.value / 100) * audio.duration;
-    };
-
-    loadTrack(current);
 
     function copyUsername() {
       const username = "@Konmeo22132";
@@ -279,10 +268,8 @@ p {
       });
     }
 
-    window.addEventListener('resize', () => {
-      document.body.style.overflow = 'hidden';
-    });
     window.onload = () => {
+      loadSong(current);
       document.body.style.overflow = 'hidden';
     };
   </script></body>
