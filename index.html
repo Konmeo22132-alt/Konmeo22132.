@@ -22,14 +22,16 @@
       background: url('https://r2.guns.lol/87cdcc98-fdcc-4ae2-86c6-45d0f6d03a0f.gif') no-repeat center center fixed;
       background-size: cover;
       display: flex;
-      align-items: center; /* Căn giữa theo chiều dọc */
+      align-items: flex-start; /* Căn phần tử lên trên */
       justify-content: center;
       flex-direction: column;
       text-align: center;
+      height: 100vh; /* Đảm bảo chiều cao của body 100% */
     }
 
     .profile-container {
-      margin-top: -40%; /* Đẩy nội dung lên 40% */
+      position: relative;
+      top: 40vh; /* Đưa nội dung lên cách đầu 40% chiều cao trang */
       text-align: center;
     }
 
