@@ -1,165 +1,2495 @@
-<!DOCTYPE html>  <html lang="vi">  
-<head>  
-  <meta charset="UTF-8" />  
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>  
-  <title>Konmeo's Profile</title>  
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />  
-  <style>  
-    * {  
-      margin: 0;  
-      padding: 0;  
-      box-sizing: border-box;  
-      font-family: 'Segoe UI', sans-serif;  
-    }  html, body {  
-  height: 100%;  
-  color: white;  
-}  
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Professional Portfolio of Kem | Developer & Designer at VMOS Cloud - Based in Hanoi, Vietnam">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="keywords" content="Kem, VMOS Cloud, Developer, Designer, Portfolio, Web Development, Frontend, Backend, UI, UX, React, Vue, Nodejs, Hanoi, Vietnam">
+    <meta property="og:title" content="Kem 🐧 | VMOS Cloud - Developer Portfolio">
+    <meta property="og:description" content="Professional Portfolio of Kem | Developer & Designer at VMOS Cloud">
+    <meta property="og:image" content="https://raw.githubusercontent.com/vmoscloudteam/team/refs/heads/master/kem/kem.webp">
+    <meta property="og:url" content="https://kemdev.com">
+    <meta name="twitter:card" content="summary_large_image">
 
-body {  
-  background: url('https://r2.guns.lol/87cdcc98-fdcc-4ae2-86c6-45d0f6d03a0f.gif') no-repeat center center fixed;  
-  background-size: cover;  
-  display: flex;  
-  justify-content: center;  
-  align-items: flex-start;  
-  flex-direction: column;  
-  height: 100vh;  
-}  
+    <link rel="icon" href="https://i.ibb.co/DgR2Cr7j/snapedit-1743818950330.png" type="image/png">
+    <title>Konmeo22132 | Vo danh - Portfolio</title>
 
-.profile-container {  
-  position: absolute;  
-  left: 50%;  
-  transform: translateX(-50%);  
-  text-align: center;  
-  display: flex;  
-  flex-direction: column;  
-  align-items: center;  
-}  
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" as="style">
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js" as="script">
+    <link rel="preload" href="https://r2.guns.lol/b65254e6-42c8-4c6f-90ae-142dce4dbb25.webp" as="image">
+    <link rel="preload" href="https://r2.guns.lol/87cdcc98-fdcc-4ae2-86c6-45d0f6d03a0f.gif" as="image">
 
-.avatar {  
-  width: 150px;  
-  height: 150px;  
-  border-radius: 50%;  
-  margin-bottom: 10px;  
-  background-image: url('https://r2.guns.lol/7d8aa970-cae5-44db-aef2-800458e6e6f1.webp');  
-  background-size: cover;  
-  background-position: center;  
-}  
+    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"></noscript>
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet"></noscript>
 
-h1 {  
-  font-size: 3em;  
-  margin-bottom: 0.3em;  
-  text-shadow: 0 0 10px #000;  
-}  
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css"/>
 
-p {  
-  font-size: 1.2em;  
-  text-shadow: 0 0 10px #000;  
-  margin-bottom: 1.5em;  
-}  
+    <style>
+        :root {
+            --primary: #5865F2;
+            --primary-dark: #4752C4;
+            --secondary: #FACC15;
+            --secondary-dark: #EAB308;
+            --success: #3BA55C;
+            --danger: #ED4245;
+            --warning: #f97316;
+            --info: #3abff8;
+            --dark: #0F172A;
+            --dark-medium: #1E293B;
+            --darker: #020617;
+            --light: #F1F5F9;
+            --light-medium: #cbd5e1;
+            --muted: #94A3B8;
+            --dark-muted: #475569;
+            --border-color: rgba(148, 163, 184, 0.2);
 
-.frosted-box {  
-  margin-top: 10px;  
-  width: 80vw;  
-  max-width: 800px;  
-  border-radius: 20px;  
-  background: rgba(255, 255, 255, 0.15);  
-  backdrop-filter: blur(15px);  
-  -webkit-backdrop-filter: blur(15px);  
-  box-shadow: 0 0 30px rgba(0, 0, 0, 0.2);  
-}  
+            --gradient-primary: linear-gradient(135deg, #5865F2, #9B59B6);
+            --gradient-secondary: linear-gradient(135deg, #FACC15, #F97316);
+            --gradient-dark: linear-gradient(135deg, #0F172A, #1E293B);
+            --gradient-border: linear-gradient(90deg, var(--primary), var(--secondary));
 
-.discord-icon {  
-  position: fixed;  
-  bottom: 20px;  
-  right: 20px;  
-  font-size: 2em;  
-  cursor: pointer;  
-  color: #7289da;  
-  transition: transform 0.2s ease;  
-}  
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
+            --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.15);
+            --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.2);
+            --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.25);
+            --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+            --shadow-primary: 0 0 15px rgba(88, 101, 242, 0.4);
+            --shadow-secondary: 0 0 15px rgba(250, 204, 21, 0.4);
 
-.discord-icon:hover {  
-  transform: scale(1.1);  
-}  
+            --transition-fast: all 0.2s ease;
+            --transition-normal: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-slow: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 
-.toast {  
-  position: fixed;  
-  bottom: 30px;  
-  left: 30px;  
-  background: rgba(0, 0, 0, 0.7);  
-  padding: 10px 20px;  
-  border-radius: 10px;  
-  font-size: 1em;  
-  display: none;  
-  color: white;  
-}  
+            --space-xxs: 0.125rem;
+            --space-xs: 0.25rem;
+            --space-sm: 0.5rem;
+            --space-md: 1rem;
+            --space-lg: 1.5rem;
+            --space-xl: 2rem;
+            --space-2xl: 3rem;
+            --space-3xl: 4rem;
+            --space-4xl: 6rem;
 
-@media (max-width: 767px) {  
-  .profile-container {  
-    top: 4cm; /* Cách đầu trang 4cm trên điện thoại */  
-  }  
+            --rounded-sm: 0.25rem;
+            --rounded-md: 0.5rem;
+            --rounded-lg: 0.75rem;
+            --rounded-xl: 1rem;
+            --rounded-full: 9999px;
 
-  h1 {  
-    font-size: 2.2em;  
-  }  
+            --text-xs: 0.75rem;
+            --text-sm: 0.875rem;
+            --text-base: 1rem;
+            --text-lg: 1.125rem;
+            --text-xl: 1.25rem;
+            --text-2xl: 1.5rem;
+            --text-3xl: 1.875rem;
+            --text-4xl: 2.25rem;
+            --text-5xl: 3rem;
+            --text-6xl: 3.75rem;
 
-  p {  
-    font-size: 1em;  
-  }  
+            --z-back: -1;
+            --z-base: 1;
+            --z-content: 10;
+            --z-header: 1000;
+            --z-mobile-menu: 1001;
+            --z-back-to-top: 900;
+            --z-preloader: 9999;
+            --z-modal: 10000;
+        }
 
-  .frosted-box {  
-    width: 90%;  
-    height: 70px;  
-  }  
-}  
+        body.light-mode {
+            --dark: #F1F5F9;
+            --light: #0F172A;
+            --dark-medium: #e2e8f0;
+            --darker: #cbd5e1;
+            --light-medium: #334155;
+            --muted: #64748b;
+            --dark-muted: #94a3b8;
+            --border-color: rgba(15, 23, 42, 0.2);
+        }
 
-@media (min-width: 768px) {  
-  .profile-container {  
-    top: 2cm; /* Đã chỉnh từ 7cm xuống 2cm */  
-  }  
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-  h1 {  
-    font-size: 3em;  
-  }  
+        html {
+            scroll-behavior: smooth;
+            overflow-x: hidden;
+            font-size: 16px;
+        }
 
-  p {  
-    font-size: 1.2em;  
-  }  
+        body {
+            font-family: 'Poppins', sans-serif;
+            color: var(--light);
+            background-color: var(--dark);
+            line-height: 1.7;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            opacity: 0;
+            transition: opacity 0.6s ease-in-out;
+        }
+        body.loaded { opacity: 1; }
 
-  .frosted-box {  
-    height: 140px;  
-  }  
-}
+        :focus-visible {
+            outline: 3px solid var(--primary);
+            outline-offset: 2px;
+            border-radius: var(--rounded-sm);
+        }
 
-  </style>  
-</head>  
-<body>  
-  <div class="profile-container">  
-    <div class="avatar"></div>  
-    <h1>Konmeo22121</h1>  
-    <p>"Hay tro thanh cuc cut ma ai cung nghi la mot cu xi hoi"</p>  
-    <div class="frosted-box"></div>  
-  </div>    <div class="discord-icon" onclick="copyUsername()">  
-    <i class="fab fa-discord"></i>  
-  </div>    <div class="toast" id="toast">Đã copy username vào clipboard!</div>    <script>  
-    function copyUsername() {  
-      const username = "@Konmeo22132";  
-      navigator.clipboard.writeText(username).then(() => {  
-        const toast = document.getElementById('toast');  
-        toast.style.display = 'block';  
-        setTimeout(() => toast.style.display = 'none', 2000);  
-      });  
-    }  
-  
-    // Ngăn chặn cuộn trang khi ở cả chế độ màn hình dọc và ngang  
-    function preventScroll() {  
-      document.body.style.overflow = 'hidden'; // Ngăn cuộn trên cả mobile và PC  
-    }  
-  
-    // Kiểm tra thay đổi kích thước màn hình  
-    window.addEventListener('resize', preventScroll);  
-  
-    // Khởi tạo khi trang được tải  
-    window.onload = preventScroll;  
-  </script>  </body>  
+        img, video {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        a {
+            color: var(--primary);
+            text-decoration: none;
+            transition: var(--transition-fast);
+        }
+        a:hover {
+            color: var(--secondary);
+            text-decoration: underline;
+        }
+
+        button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            transition: var(--transition-fast);
+            color: inherit;
+            padding: 0;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            line-height: 1.3;
+            font-weight: 600;
+            margin-bottom: var(--space-md);
+        }
+
+        p {
+            margin-bottom: var(--space-md);
+            color: var(--muted);
+            max-width: 70ch;
+        }
+        p:last-child { margin-bottom: 0; }
+
+        ul, ol { list-style: none; }
+
+        .container {
+            width: 100%;
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 0 var(--space-lg);
+        }
+
+        .gradient-text {
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: inline-block;
+        }
+
+        .btn {
+            padding: var(--space-sm) var(--space-lg);
+            border-radius: var(--rounded-lg);
+            font-weight: 600;
+            font-size: var(--text-sm);
+            transition: var(--transition-normal);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-sm);
+            cursor: pointer;
+            border: 1px solid transparent;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .btn i {
+            transition: transform 0.3s ease;
+            font-size: 1em;
+        }
+
+        .btn:hover i:not(.fa-github):not(.fa-discord) {
+            transform: translateX(3px);
+        }
+
+        .btn-primary {
+            background: var(--gradient-primary);
+            background-size: 200% auto;
+            color: white;
+            box-shadow: var(--shadow-primary);
+            border: none;
+        }
+
+        .btn-primary:hover, .btn-primary:focus {
+            transform: translateY(-3px) scale(1.03);
+            box-shadow: 0 10px 20px rgba(88, 101, 242, 0.5);
+            background-position: right center;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            color: white;
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover, .btn-secondary:focus {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-3px);
+            border-color: rgba(148, 163, 184, 0.4);
+        }
+
+        .btn-sm {
+            padding: var(--space-xs) var(--space-md);
+            font-size: var(--text-xs);
+        }
+
+        .background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('https://raw.githubusercontent.com/vmoscloudteam/team/refs/heads/master/kem/kem.gif') center/cover no-repeat;
+            z-index: var(--z-back);
+            animation: subtleZoom 40s ease-in-out infinite alternate;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: var(--z-back);
+        }
+
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: calc(var(--z-back) + 1);
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: floatParticle 15s infinite linear alternate;
+        }
+
+        @keyframes subtleZoom {
+            from { transform: scale(1); }
+            to { transform: scale(1.05); }
+        }
+
+        @keyframes floatParticle {
+            0% { transform: translateY(0) translateX(0); opacity: 0.1; }
+            50% { transform: translateY(-15px) translateX(10px); opacity: 0.3; }
+            100% { transform: translateY(0) translateX(0); opacity: 0.1; }
+        }
+
+        .preloader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--darker);
+            z-index: var(--z-preloader);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.8s ease, visibility 0.8s ease;
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .preloader.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .preloader-logo {
+            width: 80px;
+            height: 80px;
+            margin-bottom: var(--space-xl);
+            animation: pulse 1.5s infinite alternate;
+        }
+
+        .progress-container {
+            width: 250px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: var(--rounded-full);
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0;
+            background: var(--gradient-secondary);
+            transition: width 1.8s cubic-bezier(0.25, 0.1, 0.25, 1);
+            border-radius: var(--rounded-full);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            100% { transform: scale(1.05); opacity: 1; }
+        }
+
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: var(--space-md) 0;
+            z-index: var(--z-header);
+            transition: padding 0.3s ease, background-color 0.3s ease, backdrop-filter 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(5px);
+            border-bottom: 1px solid transparent;
+        }
+
+        .header.scrolled {
+            padding: var(--space-sm) 0;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: var(--shadow-lg);
+            border-bottom-color: var(--border-color);
+        }
+
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            font-size: var(--text-xl);
+            font-weight: 700;
+            color: var(--light) !important;
+            text-decoration: none !important;
+        }
+        .logo:hover { color: var(--light) !important; }
+
+        .logo-img {
+            width: 36px;
+            height: 36px;
+            transition: transform 0.3s ease;
+        }
+        .logo:hover .logo-img { transform: rotate(-10deg); }
+
+        .nav-links {
+            display: flex;
+            gap: var(--space-xl);
+            list-style: none;
+        }
+
+        .nav-link {
+            position: relative;
+            font-weight: 500;
+            padding: var(--space-xs) 0;
+            color: var(--muted);
+            text-decoration: none;
+            transition: color 0.3s ease;
+            font-size: var(--text-sm);
+        }
+
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--gradient-primary);
+            transition: width 0.3s ease;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            color: var(--light);
+        }
+
+        .nav-link:hover::after, .nav-link.active::after {
+            width: 100%;
+        }
+
+        .mobile-menu-btn {
+            display: none;
+            font-size: var(--text-2xl);
+            z-index: var(--z-mobile-menu);
+            padding: var(--space-xs);
+        }
+
+        .theme-toggle {
+            background: none;
+            border: none;
+            color: var(--light);
+            font-size: var(--text-xl);
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .theme-toggle:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                position: fixed;
+                top: 0;
+                right: -100%;
+                width: 70%;
+                max-width: 300px;
+                height: 100vh;
+                background: rgba(15, 23, 42, 0.98);
+                backdrop-filter: blur(15px);
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                gap: var(--space-xl);
+                transition: right 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+                z-index: calc(var(--z-header) + 1);
+                box-shadow: -5px 0 15px rgba(0, 0, 0, 0.2);
+                border-left: 1px solid var(--border-color);
+                padding-top: var(--space-4xl);
+            }
+
+            .nav-links.active { right: 0; }
+
+            .nav-link {
+                font-size: var(--text-lg);
+                color: var(--light);
+                padding: var(--space-sm) var(--space-xl);
+                width: 100%;
+                text-align: center;
+            }
+            .nav-link::after { display: none; }
+            .nav-link.active {
+                background: var(--gradient-primary);
+                border-radius: var(--rounded-md);
+                color: white;
+            }
+
+            .mobile-menu-btn { display: block; }
+        }
+
+        .scroll-progress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 4px;
+            background: var(--primary);
+            z-index: 10001;
+            transition: width 0.3s ease;
+        }
+
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            padding-top: 120px;
+            padding-bottom: var(--space-3xl);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-content {
+            max-width: 650px;
+            z-index: var(--z-content);
+        }
+
+        .hero-title {
+            font-size: clamp(var(--text-4xl), 7vw, var(--text-6xl));
+            font-weight: 700;
+            margin-bottom: var(--space-sm);
+            line-height: 1.15;
+            letter-spacing: -1px;
+        }
+
+        .hero-subtitle {
+            font-size: clamp(var(--text-lg), 4vw, var(--text-2xl));
+            color: var(--muted);
+            margin-bottom: var(--space-lg);
+            font-weight: 400;
+        }
+
+        .hero p {
+            margin-bottom: var(--space-xl);
+            font-size: var(--text-base);
+            max-width: 550px;
+            color: var(--light-medium);
+        }
+
+        .hero-btns {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--space-md);
+            margin-top: var(--space-xl);
+        }
+
+        .typing-container { display: inline-block; }
+        .typing-text {
+            display: inline-block;
+            overflow: hidden;
+            border-right: 0.15em solid var(--primary);
+            white-space: nowrap;
+            margin: 0 auto;
+            letter-spacing: 0.1em;
+            animation: typing 3.5s steps(30, end) forwards, blink-caret .75s step-end infinite;
+        }
+
+        @keyframes typing {
+            from { width: 0; }
+            to { width: 100%; }
+        }
+        @keyframes blink-caret {
+            from, to { border-color: transparent; }
+            50% { border-color: var(--primary); }
+        }
+
+        .hero-image {
+            position: absolute;
+            right: 5%;
+            bottom: 0;
+            width: clamp(300px, 35vw, 550px);
+            max-height: 80vh;
+            z-index: var(--z-base);
+            opacity: 0.8;
+            animation: floatHero 8s ease-in-out infinite alternate;
+            object-fit: contain;
+            pointer-events: none;
+        }
+
+        @keyframes floatHero {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+            100% { transform: translateY(0); }
+        }
+
+        @media (max-width: 992px) {
+            .hero-image { opacity: 0.3; right: -5%; }
+        }
+        @media (max-width: 768px) {
+            .hero { text-align: center; padding-top: 100px; }
+            .hero-content { margin: 0 auto; }
+            .hero-image { display: none; }
+            .hero-btns { justify-content: center; }
+            .hero p { margin-left: auto; margin-right: auto; }
+        }
+        @media (max-width: 480px) {
+            .hero-btns { flex-direction: column; align-items: center; }
+            .hero-btns .btn { width: 80%; max-width: 300px; }
+        }
+
+        .section {
+            padding: var(--space-3xl) 0;
+            position: relative;
+            overflow: hidden;
+        }
+        .section:nth-of-type(even) { background-color: rgba(15, 23, 42, 0.5); }
+
+        .section-title {
+            font-size: clamp(var(--text-3xl), 5vw, var(--text-4xl));
+            font-weight: 700;
+            margin-bottom: var(--space-3xl);
+            text-align: center;
+            position: relative;
+            display: block;
+        }
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 4px;
+            background: var(--gradient-primary);
+            border-radius: var(--rounded-full);
+            opacity: 0.8;
+        }
+
+        .animate-on-scroll {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+        }
+        .animate-on-scroll.animated {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .animate-on-scroll:nth-child(2) { transition-delay: 0.1s; }
+        .animate-on-scroll:nth-child(3) { transition-delay: 0.2s; }
+        .animate-on-scroll:nth-child(4) { transition-delay: 0.3s; }
+
+        .about-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: var(--space-2xl);
+            align-items: center;
+        }
+
+        .about-image-wrapper {
+            position: relative;
+            border-radius: var(--rounded-xl);
+            overflow: hidden;
+            box-shadow: var(--shadow-lg);
+            max-width: 450px;
+            margin: 0 auto;
+        }
+        .about-image-wrapper::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top, rgba(15, 23, 42, 0.7), transparent 60%);
+            z-index: 1;
+        }
+
+        .about-image {
+            display: block;
+            width: 100%;
+            transition: transform 0.5s ease;
+        }
+        .about-image-wrapper:hover .about-image { transform: scale(1.05); }
+
+        .about-text h3 {
+            font-size: var(--text-2xl);
+            margin-bottom: var(--space-lg);
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            color: var(--light);
+        }
+        .about-text h3 i { color: var(--primary); }
+
+        .about-text p {
+            color: var(--light-medium);
+            margin-bottom: var(--space-lg);
+        }
+
+        .skills-title {
+            font-size: var(--text-lg);
+            margin-top: var(--space-xl);
+            margin-bottom: var(--space-md);
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            color: var(--light);
+        }
+        .skills-title i { color: var(--secondary); }
+
+        .skills {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-md);
+        }
+
+        .skill {
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+        }
+
+        .skill-name {
+            flex: 0 0 120px;
+            font-weight: 500;
+            color: var(--light);
+        }
+
+        .skill-bar {
+            flex: 1;
+            background: var(--dark-muted);
+            height: 8px;
+            border-radius: var(--rounded-full);
+            overflow: hidden;
+        }
+
+        .skill-level {
+            height: 100%;
+            background: var(--primary);
+            transition: width 1s ease-in-out;
+        }
+
+        .stats-section {
+            background: var(--gradient-dark);
+            color: var(--light);
+            padding: var(--space-3xl) 0;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--space-xl);
+            text-align: center;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: var(--space-xl) var(--space-lg);
+            border-radius: var(--rounded-lg);
+            border: 1px solid var(--border-color);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            backdrop-filter: blur(5px);
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-md);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-icon {
+            font-size: var(--text-3xl);
+            color: var(--primary);
+            margin-bottom: var(--space-md);
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .stat-number {
+            font-size: var(--text-4xl);
+            font-weight: 700;
+            color: var(--secondary);
+            margin-bottom: var(--space-xs);
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: var(--text-sm);
+            color: var(--muted);
+        }
+
+        .project-filters {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: var(--space-sm);
+            margin-bottom: var(--space-2xl);
+        }
+
+        .filter-btn {
+            padding: var(--space-xs) var(--space-lg);
+            border-radius: var(--rounded-full);
+            background-color: var(--dark-medium);
+            color: var(--muted);
+            font-size: var(--text-sm);
+            border: 1px solid var(--border-color);
+            transition: var(--transition-normal);
+        }
+
+        .filter-btn:hover {
+            background-color: var(--primary-dark);
+            color: white;
+            border-color: var(--primary-dark);
+        }
+
+        .filter-btn.active {
+            background: var(--gradient-primary);
+            color: white;
+            border-color: transparent;
+            font-weight: 600;
+        }
+
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: var(--space-xl);
+        }
+
+        .project-card {
+            background: var(--dark-medium);
+            border-radius: var(--rounded-lg);
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            opacity: 1;
+            transition: opacity 0.4s ease, transform 0.4s ease, height 0.4s ease, margin 0.4s ease, padding 0.4s ease, border 0.4s ease;
+            height: auto;
+            cursor: pointer;
+        }
+
+        .project-card.hide {
+            opacity: 0;
+            transform: scale(0.9);
+            height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+            border: none !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            border-width: 0 !important;
+            pointer-events: none;
+        }
+
+        .project-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: var(--shadow-xl);
+            border-color: rgba(148, 163, 184, 0.5);
+        }
+
+        .project-image-container {
+            position: relative;
+            overflow: hidden;
+            height: 220px;
+            background-color: var(--dark-muted);
+        }
+        .project-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.4s ease;
+        }
+        .project-card:hover .project-image { transform: scale(1.1); }
+
+        .project-content {
+            padding: var(--space-lg);
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            min-height: 150px;
+        }
+
+        .project-title {
+            font-size: var(--text-xl);
+            margin-bottom: var(--space-sm);
+            color: var(--light);
+        }
+
+        .project-description {
+            color: var(--muted);
+            margin-bottom: var(--space-md);
+            font-size: var(--text-sm);
+            flex-grow: 1;
+        }
+
+        .project-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--space-xs);
+            margin-bottom: var(--space-lg);
+        }
+
+        .project-tag {
+            background: rgba(255, 255, 255, 0.1);
+            padding: var(--space-xxs) var(--space-sm);
+            border-radius: var(--rounded-full);
+            font-size: var(--text-xs);
+            color: var(--light-medium);
+        }
+
+        .project-links {
+            display: flex;
+            gap: var(--space-sm);
+            margin-top: auto;
+        }
+
+        .project-links .btn {
+            flex-grow: 1;
+            text-align: center;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: var(--z-modal);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .modal.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background: var(--dark-medium);
+            padding: var(--space-xl);
+            border-radius: var(--rounded-lg);
+            max-width: 700px;
+            width: 90%;
+            position: relative;
+            box-shadow: var(--shadow-xl);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: var(--space-md);
+            right: var(--space-md);
+            background: none;
+            border: none;
+            font-size: var(--text-2xl);
+            color: var(--light);
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .modal-close:hover { color: var(--primary); }
+
+        .modal-image {
+            width: 100%;
+            border-radius: var(--rounded-md);
+            margin-bottom: var(--space-lg);
+        }
+
+        .modal-title {
+            font-size: var(--text-2xl);
+            margin-bottom: var(--space-md);
+        }
+
+        .modal-description {
+            font-size: var(--text-base);
+            color: var(--light-medium);
+            margin-bottom: var(--space-lg);
+        }
+
+        .modal-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--space-sm);
+            margin-bottom: var(--space-lg);
+        }
+
+        .modal-tag {
+            background: var(--primary);
+            color: white;
+            padding: var(--space-xs) var(--space-md);
+            border-radius: var(--rounded-full);
+            font-size: var(--text-sm);
+        }
+
+        .modal-links {
+            display: flex;
+            gap: var(--space-md);
+        }
+
+        .modal-links .btn { flex: 1; }
+
+        .testimonials-section { background: var(--dark); }
+
+        .testimonials-slider {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: var(--space-md) 0 var(--space-3xl);
+            position: relative;
+        }
+
+        .swiper-slide {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: var(--space-md);
+            backface-visibility: hidden;
+            transform: translateZ(0);
+            -webkit-backface-visibility: hidden;
+            -webkit-transform: translateZ(0);
+        }
+
+        .testimonial-card {
+            background: var(--dark-medium);
+            border-radius: var(--rounded-xl);
+            padding: var(--space-xl) var(--space-lg);
+            border: 1px solid var(--border-color);
+            text-align: center;
+            width: 100%;
+            max-width: 600px;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+        }
+
+        .testimonial-author-img {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 3px solid var(--primary);
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1;
+            box-shadow: var(--shadow-md);
+            object-fit: cover;
+        }
+
+        .testimonial-content { padding-top: 50px; }
+
+        .testimonial-text {
+            font-size: var(--text-base);
+            color: var(--light-medium);
+            font-style: italic;
+            margin-bottom: var(--space-lg);
+            position: relative;
+            padding: 0 var(--space-lg);
+        }
+        .testimonial-text::before {
+            content: '“';
+            position: absolute;
+            top: -10px;
+            left: 0;
+            font-size: var(--text-4xl);
+            color: var(--primary);
+            opacity: 0.3;
+        }
+
+        .testimonial-author { margin-top: var(--space-md); }
+
+        .testimonial-author h4 {
+            font-size: var(--text-lg);
+            margin-bottom: var(--space-xs);
+            color: var(--light);
+        }
+
+        .testimonial-author span {
+            font-size: var(--text-sm);
+            color: var(--muted);
+        }
+
+        .testimonial-quote {
+            position: absolute;
+            bottom: var(--space-md);
+            right: var(--space-lg);
+            font-size: var(--text-3xl);
+            color: var(--primary);
+            opacity: 0.2;
+        }
+
+        .swiper-button-prev, .swiper-button-next {
+            color: var(--primary) !important;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            width: 44px !important;
+            height: 44px !important;
+            transition: background-color 0.3s ease;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+        }
+        .swiper-button-prev:hover, .swiper-button-next:hover {
+            background-color: rgba(88, 101, 242, 0.3);
+        }
+        .swiper-button-prev::after, .swiper-button-next::after {
+            font-size: var(--text-lg) !important;
+        }
+
+        .swiper-button-prev { left: -10px !important; }
+        .swiper-button-next { right: -10px !important; }
+        @media (max-width: 900px) {
+            .swiper-button-prev { left: 5px !important; }
+            .swiper-button-next { right: 5px !important; }
+        }
+        @media (max-width: 500px) {
+            .swiper-button-prev, .swiper-button-next { display: none !important; }
+        }
+
+        .swiper-pagination {
+            position: static !important;
+            margin-top: var(--space-lg);
+        }
+        .swiper-pagination-bullet {
+            background: var(--muted) !important;
+            opacity: 0.7 !important;
+            transition: all 0.3s ease !important;
+            width: 10px !important;
+            height: 10px !important;
+        }
+
+        .swiper-pagination-bullet-active {
+            background: var(--primary) !important;
+            opacity: 1 !important;
+            width: 16px !important;
+            border-radius: var(--rounded-full) !important;
+        }
+
+        .contact-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: var(--space-2xl);
+            background: var(--dark-medium);
+            padding: var(--space-2xl);
+            border-radius: var(--rounded-xl);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .contact-info h3 {
+            font-size: var(--text-2xl);
+            margin-bottom: var(--space-md);
+            color: var(--light);
+        }
+
+        .contact-info p {
+            color: var(--light-medium);
+            margin-bottom: var(--space-xl);
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+            margin-bottom: var(--space-lg);
+        }
+
+        .contact-icon {
+            width: 44px;
+            height: 44px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: var(--text-lg);
+            color: var(--primary);
+            flex-shrink: 0;
+        }
+
+        .contact-item h4 {
+            font-size: var(--text-base);
+            margin-bottom: var(--space-xs);
+            color: var(--light);
+        }
+
+        .contact-item p {
+            font-size: var(--text-sm);
+            margin-bottom: 0;
+            color: var(--muted);
+            word-break: break-word;
+        }
+        .contact-item p a {
+            color: var(--muted);
+            text-decoration: none;
+        }
+        .contact-item p a:hover {
+            color: var(--primary);
+            text-decoration: underline;
+        }
+
+        .contact-socials { margin-top: var(--space-xl); }
+        .contact-socials h4 {
+            font-size: var(--text-base);
+            margin-bottom: var(--space-md);
+            color: var(--light);
+        }
+        .contact-socials a {
+            color: var(--muted);
+            font-size: var(--text-xl);
+            margin-right: var(--space-md);
+            transition: color 0.3s ease, transform 0.3s ease;
+            display: inline-block;
+        }
+        .contact-socials a:hover {
+            color: var(--primary);
+            transform: translateY(-3px);
+        }
+
+        .contact-form {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-lg);
+        }
+
+        .form-group {
+            position: relative;
+            margin-bottom: var(--space-xs);
+        }
+
+        .form-label {
+            display: block;
+            font-size: var(--text-sm);
+            color: var(--muted);
+            margin-bottom: var(--space-xs);
+        }
+
+        .form-input, .form-textarea {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: var(--rounded-md);
+            padding: var(--space-sm) var(--space-md);
+            color: var(--light);
+            font-size: var(--text-base);
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        .form-input::placeholder, .form-textarea::placeholder {
+            color: var(--light-medium);
+            opacity: 0.7;
+        }
+
+        .form-input:focus, .form-textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.3);
+        }
+
+        .form-textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .form-input.invalid, .form-textarea.invalid {
+            border-color: var(--danger);
+            box-shadow: 0 0 0 3px rgba(237, 66, 69, 0.3);
+        }
+        .error-message {
+            color: var(--danger);
+            font-size: var(--text-xs);
+            display: none;
+            position: absolute;
+            left: 0;
+            padding-top: var(--space-xs);
+        }
+
+        .form-group:has(.error-message[style="display: block;"]) {
+            padding-bottom: 1.5em;
+        }
+
+        .form-input.invalid + .error-message, .form-textarea.invalid + .error-message {
+            display: block;
+        }
+
+        #formStatus {
+            margin-top: var(--space-md);
+            padding: var(--space-sm) var(--space-md);
+            border-radius: var(--rounded-md);
+            font-size: var(--text-sm);
+            text-align: center;
+            display: none;
+        }
+        #formStatus.visible { display: block; }
+        #formStatus.info {
+            background-color: rgba(58, 191, 248, 0.2);
+            color: var(--info);
+            border: 1px solid var(--info);
+        }
+        #formStatus.success {
+            background-color: rgba(59, 165, 92, 0.2);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+        #formStatus.error {
+            background-color: rgba(237, 66, 69, 0.2);
+            color: var(--danger);
+            border: 1px solid var(--danger);
+        }
+
+        .form-submit-btn {
+            width: 100%;
+            padding: var(--space-md);
+            margin-top: var(--space-sm);
+        }
+        .form-submit-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            background: var(--dark-muted);
+            box-shadow: none;
+            transform: none;
+        }
+
+        .footer {
+            background: var(--darker);
+            padding: var(--space-2xl) 0 var(--space-lg);
+            border-top: 1px solid var(--border-color);
+            margin-top: var(--space-3xl);
+        }
+
+        .footer-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: var(--space-lg);
+            text-align: center;
+        }
+
+        .footer-logo {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            font-size: var(--text-xl);
+            font-weight: 700;
+            color: var(--light) !important;
+            text-decoration: none !important;
+            margin-bottom: var(--space-xs);
+        }
+
+        .footer-links {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: var(--space-lg);
+            margin-bottom: var(--space-xs);
+        }
+
+        .footer-link {
+            color: var(--muted);
+            font-size: var(--text-sm);
+            text-decoration: none;
+        }
+        .footer-link:hover {
+            color: var(--primary);
+            text-decoration: underline;
+        }
+
+        .social-links {
+            display: flex;
+            gap: var(--space-lg);
+            margin-bottom: var(--space-md);
+        }
+
+        .social-links .social-link {
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: var(--text-lg);
+            color: var(--muted);
+            transition: background-color 0.3s ease, color 0.3s ease, transform 0.3s ease;
+        }
+
+        .social-links .social-link:hover {
+            background: var(--primary);
+            color: white;
+            transform: translateY(-3px);
+            text-decoration: none;
+        }
+
+        .copyright {
+            color: var(--muted);
+            font-size: var(--text-sm);
+            margin-bottom: var(--space-xs);
+        }
+        .copyright i {
+            font-size: 0.9em;
+            margin: 0 var(--space-xxs);
+            vertical-align: baseline;
+        }
+
+        .location-info {
+            color: var(--dark-muted);
+            font-size: var(--text-xs);
+            margin-bottom: 0;
+        }
+        .location-info i { margin-right: var(--space-xs); }
+
+        .back-to-top {
+            position: fixed;
+            bottom: var(--space-lg);
+            right: var(--space-lg);
+            width: 44px;
+            height: 44px;
+            background: var(--gradient-primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: var(--text-lg);
+            box-shadow: var(--shadow-lg);
+            z-index: var(--z-back-to-top);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(20px);
+            transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease;
+        }
+
+        .back-to-top.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .back-to-top:hover {
+            transform: scale(1.1);
+            box-shadow: var(--shadow-xl);
+        }
+        .back-to-top:focus-visible {
+            outline: 3px solid var(--primary);
+            outline-offset: 3px;
+        }
+
+        @media (max-width: 1024px) {
+            .container { padding: 0 var(--space-lg); }
+            .about-grid, .stats-grid, .projects-grid, .contact-grid { gap: var(--space-lg); }
+            .projects-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+        }
+
+        @media (max-width: 768px) {
+            html { font-size: 15px; }
+            .section { padding: var(--space-2xl) 0; }
+            .section-title { margin-bottom: var(--space-xl); }
+            .section-title::after { bottom: -10px; }
+            .about-grid, .contact-grid {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+            .about-image-wrapper {
+                max-width: 350px;
+                margin-bottom: var(--space-xl);
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .about-text h3, .skills-title, .contact-info h3 { justify-content: center; }
+            .skills { justify-content: center; }
+            .contact-grid { padding: var(--space-lg); }
+            .contact-item { justify-content: center; text-align: left; }
+            .contact-socials { text-align: center; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 480px) {
+            html { font-size: 14px; }
+            .container { padding: 0 var(--space-md); }
+            .section { padding: var(--space-xl) 0; }
+            .section-title { margin-bottom: var(--space-lg); }
+            .btn { padding: var(--space-sm) var(--space-md); font-size: var(--text-sm); }
+            .stats-grid { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--space-md); }
+            .stat-card { padding: var(--space-lg) var(--space-md); }
+            .projects-grid { grid-template-columns: 1fr; gap: var(--space-lg); }
+            .filter-btn { font-size: var(--text-xs); padding: var(--space-xs) var(--space-md); }
+            .project-filters { margin-bottom: var(--space-xl); }
+            .testimonial-card { padding: var(--space-lg) var(--space-md); }
+            .testimonial-author-img { width: 60px; height: 60px; }
+            .testimonial-content { padding-top: 35px; }
+            .footer-links { gap: var(--space-md); }
+            .social-links { gap: var(--space-md); }
+            .contact-grid { padding: var(--space-md); gap: var(--space-lg); }
+            .form-group:has(.error-message[style="display: block;"]) { padding-bottom: 1.8em; }
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border-width: 0;
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="preloader" id="preloader">
+        <img src="https://i.ibb.co/DgR2Cr7j/snapedit-1743818950330.png" class="preloader-logo" alt="Logo Loading Animation" loading="lazy">
+        <div class="progress-container">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+    </div>
+
+    <div class="scroll-progress"></div>
+    <div class="background" aria-hidden="true"></div>
+    <div class="overlay" aria-hidden="true"></div>
+    <div class="particles" id="particles" aria-hidden="true"></div>
+
+    <header class="header" id="header">
+        <div class="container">
+            <nav class="nav" aria-label="Main Navigation">
+                <a href="#home" class="logo">
+                    <img src="https://i.ibb.co/DgR2Cr7j/snapedit-1743818950330.png" class="logo-img" alt="Kem Logo" loading="lazy">
+                    <span>Kem</span>
+                </a>
+
+                <ul class="nav-links" id="navLinks">
+                    <li><a href="#home" class="nav-link active">Home</a></li>
+                    <li><a href="#about" class="nav-link">About</a></li>
+                    <li><a href="#projects" class="nav-link">Projects</a></li>
+                    <li><a href="#contact" class="nav-link">Contact</a></li>
+                </ul>
+
+                <div>
+                    <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="navLinks">
+                        <i class="fas fa-bars" aria-hidden="true"></i>
+                        <span class="sr-only">Open menu</span>
+                    </button>
+                    <button id="themeToggle" class="theme-toggle" aria-label="Toggle light/dark mode">
+                        <i class="fas fa-moon" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <main id="main-content">
+        <section class="hero section" id="home" aria-labelledby="hero-title">
+            <div class="container">
+                <div class="hero-content">
+                    <h1 class="hero-title" id="hero-title">Hi, I'm <span class="gradient-text typing-container"><span class="typing-text">Kem</span></span></h1>
+                    <h2 class="hero-subtitle">Developer & Designer at VMOS Cloud</h2>
+                    <p class="animate-on-scroll">
+                        Passionate about creating beautiful, functional, and high-performance web experiences. I contribute to innovative projects at VMOS Cloud. My expertise lies in front-end development (React, Vue, modern CSS) but I'm also comfortable navigating the back-end (Node.js, Express) and databases (MongoDB, Firebase).
+                    </p>
+                    <p>
+                        I thrive on challenges and am dedicated to building high-performance web applications with exceptional user interfaces. Always eager to learn and adapt to new technologies.
+                    </p>
+                    <div class="hero-btns">
+                        <a href="#projects" class="btn btn-primary">View Projects</a>
+                        <a href="#contact" class="btn btn-secondary">Contact Me</a>
+                    </div>
+                </div>
+                <img src="https://raw.githubusercontent.com/vmoscloudteam/team/refs/heads/master/kem/kem.webp" class="hero-image" alt="Kem's Avatar" loading="lazy">
+            </div>
+        </section>
+
+        <section class="section" id="about" aria-labelledby="about-title">
+            <div class="container">
+                <h2 class="section-title animate-on-scroll" id="about-title">About <span class="gradient-text">Me</span></h2>
+                <div class="about-grid">
+                    <div class="about-image-wrapper animate-on-scroll">
+                        <img src="https://raw.githubusercontent.com/vmoscloudteam/team/refs/heads/master/kem/kem.webp" class="about-image" alt="Kem's Profile Image" loading="lazy">
+                    </div>
+                    <div class="about-text animate-on-scroll" style="transition-delay: 0.1s;">
+                        <h3><i class="fas fa-user" aria-hidden="true"></i> Who I Am</h3>
+                        <p>
+                            I'm Kem, a developer and designer based in Hanoi, Vietnam, working with VMOS Cloud. I specialize in crafting seamless digital experiences that combine aesthetics with functionality.
+                        </p>
+                        <h4 class="skills-title"><i class="fas fa-cogs" aria-hidden="true"></i> Key Skills</h4>
+                        <div class="skills" role="list" aria-label="Key Skills">
+                            <div class="skill" role="listitem" aria-label="HTML5: 90% proficiency">
+                                <span class="skill-name">HTML5</span>
+                                <div class="skill-bar" role="progressbar" aria-valuenow="90" aria-valuemin="0" aria-valuemax="100">
+                                    <div class="skill-level" style="width: 90%;"></div>
+                                </div>
+                            </div>
+                            <div class="skill" role="listitem" aria-label="CSS3/Sass: 85% proficiency">
+                                <span class="skill-name">CSS3/Sass</span>
+                                <div class="skill-bar" role="progressbar" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100">
+                                    <div class="skill-level" style="width: 85%;"></div>
+                                </div>
+                            </div>
+                            <div class="skill" role="listitem" aria-label="JavaScript (ES6+): 80% proficiency">
+                                <span class="skill-name">JavaScript</span>
+                                <div class="skill-bar" role="progressbar" aria-valuenow="80" aria-valuemin="0" aria-valuemax="100">
+                                    <div class="skill-level" style="width: 80%;"></div>
+                                </div>
+                            </div>
+                            <div class="skill" role="listitem" aria-label="React: 75% proficiency">
+                                <span class="skill-name">React</span>
+                                <div class="skill-bar" role="progressbar" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100">
+                                    <div class="skill-level" style="width: 75%;"></div>
+                                </div>
+                            </div>
+                            <div class="skill" role="listitem" aria-label="Vue.js: 70% proficiency">
+                                <span class="skill-name">Vue.js</span>
+                                <div class="skill-bar" role="progressbar" aria-valuenow="70" aria-valuemin="0" aria-valuemax="100">
+                                    <div class="skill-level" style="width: 70%;"></div>
+                                </div>
+                            </div>
+                            <div class="skill" role="listitem" aria-label="Node.js: 65% proficiency">
+                                <span class="skill-name">Node.js</span>
+                                <div class="skill-bar" role="progressbar" aria-valuenow="65" aria-valuemin="0" aria-valuemax="100">
+                                    <div class="skill-level" style="width: 65%;"></div>
+                                </div>
+                            </div>
+                            <div class="skill" role="listitem" aria-label="MongoDB: 60% proficiency">
+                                <span class="skill-name">MongoDB</span>
+                                <div class="skill-bar" role="progressbar" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100">
+                                    <div class="skill-level" style="width: 60%;"></div>
+                                </div>
+                            </div>
+                            <div class="skill" role="listitem" aria-label="Git/GitHub: 85% proficiency">
+                                <span class="skill-name">Git/GitHub</span>
+                                <div class="skill-bar" role="progressbar" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100">
+                                    <div class="skill-level" style="width: 85%;"></div>
+                                </div>
+                            </div>
+                            <div class="skill" role="listitem" aria-label="UI/UX Design: 80% proficiency">
+                                <span class="skill-name">UI/UX Design</span>
+                                <div class="skill-bar" role="progressbar" aria-valuenow="80" aria-valuemin="0" aria-valuemax="100">
+                                    <div class="skill-level" style="width: 80%;"></div>
+                                </div>
+                            </div>
+                            <div class="skill" role="listitem" aria-label="Responsive Design: 90% proficiency">
+                                <span class="skill-name">Responsive Design</span>
+                                <div class="skill-bar" role="progressbar" aria-valuenow="90" aria-valuemin="0" aria-valuemax="100">
+                                    <div class="skill-level" style="width: 90%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section stats-section" aria-labelledby="stats-title">
+            <div class="container">
+                <h2 class="section-title animate-on-scroll" id="stats-title">My <span class="gradient-text">Achievements</span></h2>
+                <div class="stats-grid">
+                    <div class="stat-card animate-on-scroll">
+                        <i class="fas fa-project-diagram stat-icon" aria-hidden="true"></i>
+                        <div class="stat-number" data-count="50">0</div>
+                        <div class="stat-label">Projects Completed</div>
+                    </div>
+                    <div class="stat-card animate-on-scroll" style="transition-delay: 0.1s;">
+                        <i class="fas fa-code stat-icon" aria-hidden="true"></i>
+                        <div class="stat-number" data-count="5">0</div>
+                        <div class="stat-label">Years Experience</div>
+                    </div>
+                    <div class="stat-card animate-on-scroll" style="transition-delay: 0.2s;">
+                        <i class="fas fa-smile-beam stat-icon" aria-hidden="true"></i>
+                        <div class="stat-number" data-count="100">0</div>
+                        <div class="stat-label">Positive Feedbacks</div>
+                    </div>
+                    <div class="stat-card animate-on-scroll" style="transition-delay: 0.3s;">
+                        <i class="fas fa-mug-hot stat-icon" aria-hidden="true"></i>
+                        <div class="stat-number" data-count="999">0</div>
+                        <div class="stat-label">Cups of Coffee</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" id="projects" aria-labelledby="projects-title">
+            <div class="container">
+                <h2 class="section-title animate-on-scroll" id="projects-title">Featured <span class="gradient-text">Projects</span></h2>
+                <div class="project-filters animate-on-scroll" style="transition-delay: 0.2s;" role="tablist" aria-label="Project Filters">
+                    <button class="filter-btn active" data-filter="all" role="tab" aria-selected="true">All</button>
+                    <button class="filter-btn" data-filter="react" role="tab" aria-selected="false">React</button>
+                    <button class="filter-btn" data-filter="vue" role="tab" aria-selected="false">Vue.js</button>
+                    <button class="filter-btn" data-filter="node" role="tab" aria-selected="false">Node.js</button>
+                    <button class="filter-btn" data-filter="uiux" role="tab" aria-selected="false">UI/UX</button>
+                </div>
+                <div class="projects-grid" aria-live="polite">
+                    <article class="project-card animate-on-scroll" data-tags="react,node,mongodb,uiux" data-title="VMOS Cloud Platform" data-description="A comprehensive cloud management solution for businesses. Built with React and Node.js, this platform streamlines workflows and enhances productivity with a sleek, user-friendly interface." data-image="https://picsum.photos/seed/project1/600/400" data-demo="https://example.com/vmos-demo" data-code="https://github.com/kem/vmos-cloud" aria-labelledby="project-title-1">
+                        <div class="project-image-container">
+                            <img src="https://picsum.photos/seed/project1/600/400" class="project-image" alt="VMOS Cloud Platform Screenshot" loading="lazy">
+                        </div>
+                        <div class="project-content">
+                            <h3 class="project-title" id="project-title-1">VMOS Cloud Platform</h3>
+                            <p class="project-description">
+                                A comprehensive cloud management solution for businesses. Built with React and Node.js.
+                            </p>
+                            <div class="project-tags" aria-label="Technologies used">
+                                <span class="project-tag">React</span>
+                                <span class="project-tag">Node.js</span>
+                                <span class="project-tag">MongoDB</span>
+                                <span class="project-tag">UI/UX</span>
+                            </div>
+                            <div class="project-links">
+                                <a href="https://example.com/vmos-demo" class="btn btn-secondary btn-sm" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">
+                                    <i class="fas fa-eye" aria-hidden="true"></i> Live Demo
+                                </a>
+                                <a href="https://github.com/kem/vmos-cloud" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">
+                                    <i class="fab fa-github" aria-hidden="true"></i> Code
+                                </a>
+                            </div>
+                        </div>
+                    </article>
+                    <article class="project-card animate-on-scroll" data-tags="vue,firebase,uiux" data-title="E-commerce Dashboard" data-description="Feature-rich admin panel for managing products, orders, and customers. Built with Vue.js and Firebase, it provides real-time updates and intuitive controls for e-commerce management." data-image="https://picsum.photos/seed/project2/600/400" data-demo="https://example.com/ecommerce-demo" data-code="https://github.com/kem/ecommerce-dashboard" aria-labelledby="project-title-2">
+                        <div class="project-image-container">
+                            <img src="https://picsum.photos/seed/project2/600/400" class="project-image" alt="E-commerce Dashboard Screenshot" loading="lazy">
+                        </div>
+                        <div class="project-content">
+                            <h3 class="project-title" id="project-title-2">E-commerce Dashboard</h3>
+                            <p class="project-description">
+                                Feature-rich admin panel for managing products, orders, and customers. Using Vue.js and Firebase.
+                            </p>
+                            <div class="project-tags" aria-label="Technologies used">
+                                <span class="project-tag">Vue.js</span>
+                                <span class="project-tag">Firebase</span>
+                                <span class="project-tag">Chart.js</span>
+                                <span class="project-tag">UI/UX</span>
+                            </div>
+                            <div class="project-links">
+                                <a href="https://example.com/ecommerce-demo" class="btn btn-secondary btn-sm" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">
+                                    <i class="fas fa-eye" aria-hidden="true"></i> Live Demo
+                                </a>
+                                <a href="https://github.com/kem/ecommerce-dashboard" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">
+                                    <i class="fab fa-github" aria-hidden="true"></i> Code
+                                </a>
+                            </div>
+                        </div>
+                    </article>
+                    <article class="project-card animate-on-scroll" data-tags="html,css,js,uiux" data-title="Creative Portfolio Template" data-description="A modern and animated portfolio template built with vanilla HTML, CSS, and JavaScript. Perfect for showcasing personal projects with a touch of creativity." data-image="https://picsum.photos/seed/project3/600/400" data-demo="https://example.com/portfolio-demo" data-code="https://github.com/kem/portfolio-template" aria-labelledby="project-title-3">
+                        <div class="project-image-container">
+                            <img src="https://picsum.photos/seed/project3/600/400" class="project-image" alt="Creative Portfolio Template Screenshot" loading="lazy">
+                        </div>
+                        <div class="project-content">
+                            <h3 class="project-title" id="project-title-3">Creative Portfolio Template</h3>
+                            <p class="project-description">
+                                A modern and animated portfolio template built with vanilla HTML, CSS, and JavaScript.
+                            </p>
+                            <div class="project-tags" aria-label="Technologies used">
+                                <span class="project-tag">HTML/CSS</span>
+                                <span class="project-tag">JavaScript</span>
+                                <span class="project-tag">GSAP</span>
+                                <span class="project-tag">UI/UX</span>
+                            </div>
+                            <div class="project-links">
+                                <a href="https://example.com/portfolio-demo" class="btn btn-secondary btn-sm" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">
+                                    <i class="fas fa-eye" aria-hidden="true"></i> Live Demo
+                                </a>
+                                <a href="https://github.com/kem/portfolio-template" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">
+                                    <i class="fab fa-github" aria-hidden="true"></i> Code
+                                </a>
+                            </div>
+                        </div>
+                    </article>
+                    <article class="project-card animate-on-scroll" data-tags="react,node" data-title="Task Management App" data-description="A collaborative task management tool built with React and Express.js. Designed to improve team productivity with real-time task tracking and updates." data-image="https://picsum.photos/seed/project4/600/400" data-demo="https://example.com/task-demo" data-code="https://github.com/kem/task-manager" aria-labelledby="project-title-4">
+                        <div class="project-image-container">
+                            <img src="https://picsum.photos/seed/project4/600/400" class="project-image" alt="Task Management App Screenshot" loading="lazy">
+                        </div>
+                        <div class="project-content">
+                            <h3 class="project-title" id="project-title-4">Task Management App</h3>
+                            <p class="project-description">
+                                A collaborative task management tool built with React and Express.js for improved team productivity.
+                            </p>
+                            <div class="project-tags" aria-label="Technologies used">
+                                <span class="project-tag">React</span>
+                                <span class="project-tag">Node.js</span>
+                                <span class="project-tag">Express</span>
+                            </div>
+                            <div class="project-links">
+                                <a href="https://example.com/task-demo" class="btn btn-secondary btn-sm" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">
+                                    <i class="fas fa-eye" aria-hidden="true"></i> Live Demo
+                                </a>
+                                <a href="https://github.com/kem/task-manager" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">
+                                    <i class="fab fa-github" aria-hidden="true"></i> Code
+                                </a>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="section testimonials-section" id="testimonials" aria-labelledby="testimonials-title">
+            <div class="container">
+                <h2 class="section-title animate-on-scroll" id="testimonials-title">Client <span class="gradient-text">Testimonials</span></h2>
+                <div class="swiper testimonials-slider animate-on-scroll" style="transition-delay: 0.2s;">
+                    <div class="swiper-wrapper">
+                        <div class="swiper-slide" role="group" aria-label="Testimonial 1 of 3">
+                            <figure class="testimonial-card">
+                                <img src="https://randomuser.me/api/portraits/men/32.jpg" alt="Photo of John Smith" class="testimonial-author-img" loading="lazy">
+                                <figcaption class="testimonial-content">
+                                    <blockquote class="testimonial-text">"Kem delivered an exceptional website that exceeded our expectations. His attention to detail and creative approach made all the difference. Highly professional and easy to work with."</blockquote>
+                                    <div class="testimonial-author">
+                                        <h4>John Smith</h4>
+                                        <span>CEO, TechCorp</span>
+                                    </div>
+                                    <div class="testimonial-quote" aria-hidden="true"><i class="fas fa-quote-right"></i></div>
+                                </figcaption>
+                            </figure>
+                        </div>
+                        <div class="swiper-slide" role="group" aria-label="Testimonial 2 of 3">
+                            <figure class="testimonial-card">
+                                <img src="https://randomuser.me/api/portraits/women/44.jpg" alt="Photo of Sarah Johnson" class="testimonial-author-img" loading="lazy">
+                                <figcaption class="testimonial-content">
+                                    <blockquote class="testimonial-text">"Working with Kem was a pleasure. He understood our vision perfectly and translated it into a beautiful, functional digital product. Communication was excellent throughout the project."</blockquote>
+                                    <div class="testimonial-author">
+                                        <h4>Sarah Johnson</h4>
+                                        <span>Marketing Director, BrandCo</span>
+                                    </div>
+                                    <div class="testimonial-quote" aria-hidden="true"><i class="fas fa-quote-right"></i></div>
+                                </figcaption>
+                            </figure>
+                        </div>
+                        <div class="swiper-slide" role="group" aria-label="Testimonial 3 of 3">
+                            <figure class="testimonial-card">
+                                <img src="https://randomuser.me/api/portraits/men/75.jpg" alt="Photo of Michael Chen" class="testimonial-author-img" loading="lazy">
+                                <figcaption class="testimonial-content">
+                                    <blockquote class="testimonial-text">"Kem's technical expertise and design sensibility are top-notch. The platform he built for us is robust, performant, and user-friendly. We couldn't be happier with the result."</blockquote>
+                                    <div class="testimonial-author">
+                                        <h4>Michael Chen</h4>
+                                        <span>CTO, StartupX</span>
+                                    </div>
+                                    <div class="testimonial-quote" aria-hidden="true"><i class="fas fa-quote-right"></i></div>
+                                </figcaption>
+                            </figure>
+                        </div>
+                    </div>
+                    <div class="swiper-pagination" role="tablist" aria-label="Testimonial Pagination"></div>
+                    <button class="swiper-button-prev" aria-label="Previous testimonial"></button>
+                    <button class="swiper-button-next" aria-label="Next testimonial"></button>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" id="contact" aria-labelledby="contact-title">
+            <div class="container">
+                <h2 class="section-title animate-on-scroll" id="contact-title">Get In <span class="gradient-text">Touch</span></h2>
+                <div class="contact-grid animate-on-scroll" style="transition-delay: 0.2s;">
+                    <div class="contact-info">
+                        <h3>Let's Connect!</h3>
+                        <p>
+                            Have a project in mind, a question, or just want to say hi? Feel free to reach out. I'm always open to discussing new ideas and opportunities from my base in Hanoi.
+                        </p>
+                        <div class="contact-item">
+                            <div class="contact-icon" aria-hidden="true"><i class="fas fa-envelope"></i></div>
+                            <div>
+                                <h4>Email</h4>
+                                <p><a href="/cdn-cgi/l/email-protection#6e0d01001a0f0d1a2e050b030a0b18400d0103"><span class="__cf_email__" data-cfemail="9cbff3b2a8bdbfa8dcb7b9b1b8b9aaf2bfb3b1">[email&#160;protected]</span></a></p>
+                            </div>
+                        </div>
+                        <div class="contact-item">
+                            <div class="contact-icon" aria-hidden="true"><i class="fab fa-discord"></i></div>
+                            <div>
+                                <h4>Discord</h4>
+                                <p>Kem#1234</p>
+                            </div>
+                        </div>
+                        <div class="contact-item">
+                            <div class="contact-icon" aria-hidden="true"><i class="fas fa-map-marker-alt"></i></div>
+                            <div>
+                                <h4>Location</h4>
+                                <p>Hanoi, Vietnam</p>
+                            </div>
+                        </div>
+                        <div class="contact-socials">
+                            <h4>Follow Me:</h4>
+                            <a href="#" target="_blank" rel="noopener noreferrer" aria-label="My GitHub Profile"><i class="fab fa-github" aria-hidden="true"></i></a>
+                            <a href="#" target="_blank" rel="noopener noreferrer" aria-label="My LinkedIn Profile"><i class="fab fa-linkedin-in" aria-hidden="true"></i></a>
+                            <a href="#" target="_blank" rel="noopener noreferrer" aria-label="My Twitter Profile"><i class="fab fa-twitter" aria-hidden="true"></i></a>
+                        </div>
+                    </div>
+                    <form class="contact-form" id="contactForm" novalidate aria-label="Contact Form">
+                        <div class="form-group">
+                            <label for="name" class="form-label">Your Name</label>
+                            <input type="text" id="name" name="name" class="form-input" required placeholder="Enter your full name" aria-required="true" aria-describedby="nameError">
+                            <div class="error-message" id="nameError" role="alert"></div>
+                        </div>
+                        <div class="form-group">
+                            <label for="email" class="form-label">Your Email</label>
+                            <input type="email" id="email" name="email" class="form-input" required placeholder="Enter your email address" aria-required="true" aria-describedby="emailError">
+                            <div class="error-message" id="emailError" role="alert"></div>
+                        </div>
+                        <div class="form-group">
+                            <label for="subject" class="form-label">Subject</label>
+                            <input type="text" id="subject" name="subject" class="form-input" required placeholder="What is this about?" aria-required="true" aria-describedby="subjectError">
+                            <div class="error-message" id="subjectError" role="alert"></div>
+                        </div>
+                        <div class="form-group">
+                            <label for="message" class="form-label">Message</label>
+                            <textarea id="message" name="message" class="form-textarea" rows="5" required placeholder="Your message here..." aria-required="true" aria-describedby="messageError"></textarea>
+                            <div class="error-message" id="messageError" role="alert"></div>
+                        </div>
+                        <button type="submit" class="btn btn-primary form-submit-btn" id="submitBtn">
+                            <i class="fas fa-paper-plane" aria-hidden="true"></i> Send Message
+                        </button>
+                        <div id="formStatus" role="alert" aria-live="assertive"></div>
+                    </form>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer" role="contentinfo">
+        <div class="container">
+            <div class="footer-content">
+                <a href="#home" class="footer-logo" aria-label="Back to Home">
+                    <img src="https://i.ibb.co/DgR2Cr7j/snapedit-1743818950330.png" class="logo-img" alt="Kem Logo" loading="lazy">
+                    <span>Kem</span>
+                </a>
+                <nav aria-label="Footer Navigation">
+                    <ul class="footer-links">
+                        <li><a href="#home" class="footer-link">Home</a></li>
+                        <li><a href="#about" class="footer-link">About</a></li>
+                        <li><a href="#projects" class="footer-link">Projects</a></li>
+                        <li><a href="#contact" class="footer-link">Contact</a></li>
+                    </ul>
+                </nav>
+                <div class="social-links">
+                    <a href="#" target="_blank" rel="noopener noreferrer" class="social-link" aria-label="My GitHub Profile"><i class="fab fa-github" aria-hidden="true"></i></a>
+                    <a href="#" target="_blank" rel="noopener noreferrer" class="social-link" aria-label="My Discord Server"><i class="fab fa-discord" aria-hidden="true"></i></a>
+                    <a href="#" target="_blank" rel="noopener noreferrer" class="social-link" aria-label="My Twitter Profile"><i class="fab fa-twitter" aria-hidden="true"></i></a>
+                    <a href="#" target="_blank" rel="noopener noreferrer" class="social-link" aria-label="My LinkedIn Profile"><i class="fab fa-linkedin-in" aria-hidden="true"></i></a>
+                </div>
+                <p class="copyright">© <span id="current-year">2025</span> Kem. Designed & Developed with <i class="fas fa-heart" style="color: #ED4245;" aria-hidden="true"></i><span class="sr-only">love</span>.</p>
+                <p class="location-info"><i class="fas fa-map-marker-alt" aria-hidden="true"></i> Hanoi, Vietnam</p>
+            </div>
+        </div>
+    </footer>
+
+    <button id="backToTop" class="back-to-top hidden" aria-label="Scroll back to top of the page">
+        <i class="fas fa-arrow-up" aria-hidden="true"></i>
+    </button>
+
+    <div class="modal" id="projectModal" aria-hidden="true" role="dialog" aria-labelledby="modalTitle" aria-describedby="modalDescription">
+        <div class="modal-content">
+            <button class="modal-close" aria-label="Close modal">&times;</button>
+            <img src="" class="modal-image" alt="" loading="lazy">
+            <h3 class="modal-title" id="modalTitle"></h3>
+            <p class="modal-description" id="modalDescription"></p>
+            <div class="modal-tags" aria-label="Technologies used"></div>
+            <div class="modal-links">
+                <a href="#" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">Live Demo</a>
+                <a href="#" class="btn btn-primary" target="_blank" rel="noopener noreferrer">Code</a>
+            </div>
+        </div>
+    </div>
+
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const preloader = document.getElementById('preloader');
+            const progressBar = document.getElementById('progressBar');
+            if (preloader && progressBar) {
+                requestAnimationFrame(() => {
+                    progressBar.style.width = '100%';
+                });
+
+                let loaded = false;
+                const hidePreloader = () => {
+                    if (loaded) return;
+                    loaded = true;
+                    preloader.classList.add('hidden');
+                    document.body.classList.add('loaded');
+                    initializePageFunctions();
+                };
+
+                setTimeout(hidePreloader, 2000);
+                window.addEventListener('load', () => setTimeout(hidePreloader, 0));
+            } else {
+                console.warn("Preloader elements not found.");
+                document.body.classList.add('loaded');
+                initializePageFunctions();
+            }
+        });
+
+        function initializePageFunctions() {
+            console.log('Initializing page functions...');
+            const runSafely = (func, name) => {
+                try {
+                    func();
+                } catch (error) {
+                    console.error(`Error initializing ${name}:`, error);
+                }
+            };
+
+            runSafely(setupHeaderScroll, 'Header Scroll');
+            runSafely(setupMobileMenu, 'Mobile Menu');
+            runSafely(() => createParticles(30), 'Particles');
+            runSafely(setupScrollAnimations, 'Scroll Animations');
+            runSafely(setupSmoothScrolling, 'Smooth Scrolling');
+            runSafely(updateCopyrightYear, 'Copyright Year');
+            runSafely(setupBackToTopButton, 'Back To Top Button');
+            runSafely(initializeTestimonialSlider, 'Testimonial Slider');
+            runSafely(setupProjectFiltering, 'Project Filtering');
+            runSafely(setupContactForm, 'Contact Form');
+            runSafely(setupProjectModals, 'Project Modals');
+            runSafely(setupThemeToggle, 'Theme Toggle');
+            runSafely(setupScrollProgress, 'Scroll Progress');
+            console.log('Page functions initialization attempt complete.');
+        }
+
+        function setupHeaderScroll() {
+            const header = document.getElementById('header');
+            if (!header) return;
+            const scrollThreshold = 50;
+            let isScrolling;
+            window.addEventListener('scroll', () => {
+                window.clearTimeout(isScrolling);
+                isScrolling = setTimeout(() => {
+                    header.classList.toggle('scrolled', window.scrollY > scrollThreshold);
+                }, 50);
+            }, { passive: true });
+        }
+
+        function setupMobileMenu() {
+            const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+            const navLinks = document.getElementById('navLinks');
+            if (!mobileMenuBtn || !navLinks) return;
+
+            mobileMenuBtn.addEventListener('click', () => {
+                const isExpanded = mobileMenuBtn.getAttribute('aria-expanded') === 'true';
+                navLinks.classList.toggle('active');
+                mobileMenuBtn.setAttribute('aria-expanded', String(!isExpanded));
+                mobileMenuBtn.innerHTML = navLinks.classList.contains('active')
+                    ? '<i class="fas fa-times" aria-hidden="true"></i><span class="sr-only">Close menu</span>'
+                    : '<i class="fas fa-bars" aria-hidden="true"></i><span class="sr-only">Open menu</span>';
+            });
+
+            navLinks.querySelectorAll('.nav-link').forEach(link => {
+                link.addEventListener('click', () => {
+                    if (navLinks.classList.contains('active')) {
+                        navLinks.classList.remove('active');
+                        mobileMenuBtn.setAttribute('aria-expanded', 'false');
+                        mobileMenuBtn.innerHTML = '<i class="fas fa-bars" aria-hidden="true"></i><span class="sr-only">Open menu</span>';
+                    }
+                });
+            });
+
+            document.addEventListener('click', (event) => {
+                if (navLinks.classList.contains('active') && !navLinks.contains(event.target) && !mobileMenuBtn.contains(event.target)) {
+                    navLinks.classList.remove('active');
+                    mobileMenuBtn.setAttribute('aria-expanded', 'false');
+                    mobileMenuBtn.innerHTML = '<i class="fas fa-bars" aria-hidden="true"></i><span class="sr-only">Open menu</span>';
+                }
+            });
+        }
+
+        function createParticles(count) {
+            const particlesContainer = document.getElementById('particles');
+            if (!particlesContainer) return;
+            particlesContainer.innerHTML = '';
+            const fragment = document.createDocumentFragment();
+
+            for (let i = 0; i < count; i++) {
+                const particle = document.createElement('div');
+                particle.classList.add('particle');
+                particle.setAttribute('aria-hidden', 'true');
+                const size = Math.random() * 4 + 1;
+                const posX = Math.random() * 100;
+                const posY = Math.random() * 100;
+                const opacity = Math.random() * 0.15 + 0.05;
+                const duration = Math.random() * 25 + 15;
+                const delay = Math.random() * 15;
+
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                particle.style.left = `${posX}%`;
+                particle.style.top = `${posY}%`;
+                particle.style.opacity = String(opacity);
+                particle.style.animationDuration = `${duration}s`;
+                particle.style.animationDelay = `${delay}s`;
+                fragment.appendChild(particle);
+            }
+            particlesContainer.appendChild(fragment);
+        }
+
+        function setupScrollAnimations() {
+            const animatedElements = document.querySelectorAll('.animate-on-scroll');
+            const statNumbers = document.querySelectorAll('.stat-number');
+            const navLinks = document.querySelectorAll('.nav-links .nav-link');
+            const sections = document.querySelectorAll('section[id]');
+
+            if (typeof IntersectionObserver === 'undefined') {
+                animatedElements.forEach(el => el.classList.add('animated'));
+                statNumbers.forEach(counter => { if (!counter.dataset.animated) animateCounter(counter); });
+                return;
+            }
+
+            const animationObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const target = entry.target;
+                        target.classList.add('animated');
+                        if (target.classList.contains('stat-number') && !target.dataset.animated) {
+                            animateCounter(target);
+                            target.dataset.animated = 'true';
+                            animationObserver.unobserve(target);
+                        }
+                    }
+                });
+            }, { threshold: 0.1, rootMargin: '0px 0px -5% 0px' });
+
+            const navObserver = new IntersectionObserver((entries) => {
+                let intersectingSections = [];
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) intersectingSections.push(entry.target.getAttribute('id'));
+                });
+                let currentSectionId = intersectingSections[0];
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (currentSectionId && link.getAttribute('href') === `#${currentSectionId}`) link.classList.add('active');
+                });
+                if (window.scrollY < window.innerHeight * 0.4) {
+                    navLinks.forEach(link => link.classList.remove('active'));
+                    document.querySelector('.nav-links .nav-link[href="#home"]').classList.add('active');
+                }
+            }, { threshold: 0.4, rootMargin: '-25% 0px -45% 0px' });
+
+            animatedElements.forEach(el => el && animationObserver.observe(el));
+            sections.forEach(section => section && navObserver.observe(section));
+        }
+
+        function animateCounter(counterElement) {
+            if (!counterElement) return;
+            const target = parseInt(counterElement.getAttribute('data-count'), 10);
+            if (isNaN(target)) {
+                counterElement.textContent = counterElement.getAttribute('data-count') || 'N/A';
+                return;
+            }
+            const duration = 1500;
+            const stepDuration = 16;
+            let startTime = null;
+            counterElement.innerText = '0';
+
+            function step(timestamp) {
+                if (!startTime) startTime = timestamp;
+                const progress = timestamp - startTime;
+                const percentage = Math.min(progress / duration, 1);
+                const currentCount = Math.floor(target * percentage);
+                counterElement.innerText = currentCount.toLocaleString();
+                if (percentage < 1) requestAnimationFrame(step);
+                else counterElement.innerText = target.toLocaleString();
+            }
+            requestAnimationFrame(step);
+        }
+
+        function setupSmoothScrolling() {
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    const href = this.getAttribute('href');
+                    if (href === "#" || (href.startsWith("#") && href.length > 1)) {
+                        const targetId = href.substring(1);
+                        const targetElement = document.getElementById(targetId);
+                        if (targetElement) {
+                            e.preventDefault();
+                            const headerOffset = document.getElementById('header').offsetHeight || 80;
+                            const elementPosition = targetElement.getBoundingClientRect().top;
+                            const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+                            window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+
+                            const navLinks = document.getElementById('navLinks');
+                            const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+                            if (navLinks && navLinks.classList.contains('active') && mobileMenuBtn) {
+                                navLinks.classList.remove('active');
+                                mobileMenuBtn.setAttribute('aria-expanded', 'false');
+                                mobileMenuBtn.innerHTML = '<i class="fas fa-bars" aria-hidden="true"></i><span class="sr-only">Open menu</span>';
+                            }
+                        }
+                    }
+                });
+            });
+        }
+
+        function updateCopyrightYear() {
+            const yearElement = document.getElementById('current-year');
+            if (yearElement) yearElement.textContent = new Date().getFullYear();
+        }
+
+        function setupBackToTopButton() {
+            const backToTopBtn = document.getElementById('backToTop');
+            if (!backToTopBtn) return;
+            const scrollThreshold = 300;
+            let isScrolling;
+
+            window.addEventListener('scroll', () => {
+                window.clearTimeout(isScrolling);
+                isScrolling = setTimeout(() => {
+                    backToTopBtn.classList.toggle('show', window.scrollY > scrollThreshold);
+                    backToTopBtn.classList.toggle('hidden', window.scrollY <= scrollThreshold);
+                }, 150);
+            }, { passive: true });
+
+            backToTopBtn.addEventListener('click', () => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        }
+
+        function initializeTestimonialSlider() {
+            if (typeof Swiper === 'undefined') {
+                console.error("Swiper library not loaded.");
+                const sliderContainer = document.querySelector('.testimonials-slider');
+                if (sliderContainer) {
+                    sliderContainer.querySelectorAll('.swiper-pagination, .swiper-button-prev, .swiper-button-next').forEach(el => el && (el.style.display = 'none'));
+                }
+                return;
+            }
+            const sliderElement = document.querySelector('.testimonials-slider');
+            if (!sliderElement) return;
+
+            new Swiper('.testimonials-slider', {
+                loop: true,
+                slidesPerView: 1,
+                spaceBetween: 30,
+                grabCursor: true,
+                watchOverflow: true,
+                observer: true,
+                observeParents: true,
+                observeSlideChildren: true,
+                autoplay: { delay: 6000, disableOnInteraction: false, pauseOnMouseEnter: true },
+                pagination: { el: '.swiper-pagination', clickable: true, type: 'bullets' },
+                navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
+                a11y: { enabled: true, prevSlideMessage: 'Previous testimonial', nextSlideMessage: 'Next testimonial', paginationBulletMessage: 'Go to testimonial {{index}}' },
+                keyboard: { enabled: true, onlyInViewport: false }
+            });
+        }
+
+        function setupProjectFiltering() {
+            const filterContainer = document.querySelector('.project-filters');
+            const projectGrid = document.querySelector('.projects-grid');
+            if (!filterContainer || !projectGrid) return;
+
+            const filterButtons = filterContainer.querySelectorAll('.filter-btn');
+            const projectCards = projectGrid.querySelectorAll('.project-card');
+
+            filterContainer.addEventListener('click', (event) => {
+                if (!event.target.matches('.filter-btn')) return;
+                const clickedButton = event.target;
+                const filterValue = clickedButton.getAttribute('data-filter');
+
+                filterButtons.forEach(btn => {
+                    btn.classList.remove('active');
+                    btn.setAttribute('aria-selected', 'false');
+                });
+                clickedButton.classList.add('active');
+                clickedButton.setAttribute('aria-selected', 'true');
+
+                projectCards.forEach(card => {
+                    const tags = card.getAttribute('data-tags')?.toLowerCase().split(',') || [];
+                    const shouldShow = filterValue === 'all' || tags.includes(filterValue.toLowerCase());
+                    card.classList.toggle('hide', !shouldShow);
+                    card.toggleAttribute('hidden', !shouldShow);
+                });
+            });
+        }
+
+        function setupContactForm() {
+            const form = document.getElementById('contactForm');
+            if (!form) return;
+
+            const nameInput = form.querySelector('#name');
+            const emailInput = form.querySelector('#email');
+            const subjectInput = form.querySelector('#subject');
+            const messageInput = form.querySelector('#message');
+            const submitBtn = form.querySelector('#submitBtn');
+            const formStatus = form.querySelector('#formStatus');
+            if (!nameInput || !emailInput || !subjectInput || !messageInput || !submitBtn || !formStatus) return;
+
+            const allInputs = [nameInput, emailInput, subjectInput, messageInput];
+
+            function showError(input, message) {
+                if (!input) return;
+                input.classList.add('invalid');
+                const errorElement = document.getElementById(input.id + 'Error');
+                if (errorElement) {
+                    errorElement.textContent = message;
+                    errorElement.style.display = 'block';
+                    input.setAttribute('aria-invalid', 'true');
+                    input.setAttribute('aria-describedby', input.id + 'Error');
+                }
+            }
+
+            function clearError(input) {
+                if (!input) return;
+                input.classList.remove('invalid');
+                input.removeAttribute('aria-invalid');
+                input.removeAttribute('aria-describedby');
+                const errorElement = document.getElementById(input.id + 'Error');
+                if (errorElement) {
+                    errorElement.textContent = '';
+                    errorElement.style.display = 'none';
+                }
+            }
+
+            function validateInput(input) {
+                if (!input) return false;
+                clearError(input);
+                const value = input.value.trim();
+                let isValid = true;
+                let errorMessage = '';
+
+                if (input.required && value === '') {
+                    isValid = false;
+                    errorMessage = input.dataset.requiredError || 'This field is required.';
+                } else if (input.type === 'email' && value !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+                    isValid = false;
+                    errorMessage = input.dataset.emailError || 'Please enter a valid email address.';
+                }
+                if (!isValid) showError(input, errorMessage);
+                return isValid;
+            }
+
+            allInputs.forEach(input => {
+                let blurredOnce = false;
+                input.addEventListener('blur', () => {
+                    blurredOnce = true;
+                    validateInput(input);
+                });
+                input.addEventListener('input', () => {
+                    if (blurredOnce) validateInput(input);
+                });
+            });
+
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                formStatus.textContent = '';
+                formStatus.className = '';
+                formStatus.classList.remove('visible');
+
+                let isFormValid = true;
+                for (const input of allInputs) {
+                    if (!validateInput(input)) {
+                        isFormValid = false;
+                        input.focus();
+                        break;
+                    }
+                }
+
+                if (!isFormValid) {
+                    formStatus.textContent = 'Please correct the errors above.';
+                    formStatus.className = 'error visible';
+                    return;
+                }
+
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Sending...';
+                formStatus.textContent = 'Sending your message...';
+                formStatus.className = 'info visible';
+
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                const simulateSuccess = Math.random() > 0.1;
+
+                if (simulateSuccess) {
+                    formStatus.textContent = 'Message sent successfully! Thank you. (Simulation)';
+                    formStatus.className = 'success visible';
+                    form.reset();
+                    allInputs.forEach(clearError);
+                } else {
+                    formStatus.textContent = 'Error sending message. Please try again later. (Simulation)';
+                    formStatus.className = 'error visible';
+                }
+
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-paper-plane" aria-hidden="true"></i> Send Message';
+            });
+        }
+
+        function setupProjectModals() {
+            const projectModal = document.getElementById('projectModal');
+            const modalClose = projectModal.querySelector('.modal-close');
+            const modalImage = projectModal.querySelector('.modal-image');
+            const modalTitle = projectModal.querySelector('.modal-title');
+            const modalDescription = projectModal.querySelector('.modal-description');
+            const modalTags = projectModal.querySelector('.modal-tags');
+            const modalDemoLink = projectModal.querySelector('.modal-links .btn-secondary');
+            const modalCodeLink = projectModal.querySelector('.modal-links .btn-primary');
+            const projectCards = document.querySelectorAll('.project-card');
+            let lastFocusedElement;
+
+            function openProjectModal(projectData) {
+                lastFocusedElement = document.activeElement;
+                modalImage.src = projectData.image;
+                modalImage.alt = projectData.title + ' screenshot';
+                modalTitle.textContent = projectData.title;
+                modalDescription.textContent = projectData.description;
+                modalTags.innerHTML = '';
+                projectData.tags.forEach(tag => {
+                    const tagElement = document.createElement('span');
+                    tagElement.classList.add('modal-tag');
+                    tagElement.textContent = tag;
+                    modalTags.appendChild(tagElement);
+                });
+                modalDemoLink.href = projectData.demo;
+                modalCodeLink.href = projectData.code;
+                projectModal.classList.add('show');
+                projectModal.setAttribute('aria-hidden', 'false');
+                modalClose.focus();
+            }
+
+            function closeProjectModal() {
+                projectModal.classList.remove('show');
+                projectModal.setAttribute('aria-hidden', 'true');
+                if (lastFocusedElement) lastFocusedElement.focus();
+            }
+
+            projectCards.forEach(card => {
+                card.addEventListener('click', () => {
+                    const title = card.getAttribute('data-title');
+                    const description = card.getAttribute('data-description');
+                    const image = card.getAttribute('data-image');
+                    const tags = card.getAttribute('data-tags').split(',');
+                    const demo = card.getAttribute('data-demo');
+                    const code = card.getAttribute('data-code');
+                    openProjectModal({ title, description, image, tags, demo, code });
+                });
+
+                card.querySelectorAll('.project-links .btn').forEach(link => {
+                    link.addEventListener('click', (event) => event.stopPropagation());
+                });
+            });
+
+            modalClose.addEventListener('click', closeProjectModal);
+            projectModal.addEventListener('click', (event) => {
+                if (event.target === projectModal) closeProjectModal();
+            });
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && projectModal.classList.contains('show')) closeProjectModal();
+            });
+        }
+
+        function setupThemeToggle() {
+            const themeToggle = document.getElementById('themeToggle');
+            const body = document.body;
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme) {
+                body.classList.add(savedTheme);
+                updateThemeIcon(savedTheme);
+            }
+
+            themeToggle.addEventListener('click', () => {
+                if (body.classList.contains('light-mode')) {
+                    body.classList.remove('light-mode');
+                    localStorage.setItem('theme', 'dark-mode');
+                    updateThemeIcon('dark-mode');
+                } else {
+                    body.classList.add('light-mode');
+                    localStorage.setItem('theme', 'light-mode');
+                    updateThemeIcon('light-mode');
+                }
+            });
+
+            function updateThemeIcon(theme) {
+                const icon = themeToggle.querySelector('i');
+                if (theme === 'light-mode') {
+                    icon.classList.remove('fa-moon');
+                    icon.classList.add('fa-sun');
+                } else {
+                    icon.classList.remove('fa-sun');
+                    icon.classList.add('fa-moon');
+                }
+            }
+        }
+
+        function setupScrollProgress() {
+            const scrollProgress = document.querySelector('.scroll-progress');
+            if (!scrollProgress) return;
+
+            window.addEventListener('scroll', () => {
+                const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+                const scrollPercentage = (scrollTop / scrollHeight) * 100;
+                scrollProgress.style.width = `${scrollPercentage}%`;
+            }, { passive: true });
+        }
+    </script>
+    <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'934769cd39c2675b',t:'MTc0NTM0ODk0Mi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+</body>
 </html>
