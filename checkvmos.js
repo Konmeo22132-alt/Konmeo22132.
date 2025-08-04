@@ -1,6 +1,7 @@
 const fs = require("fs");
 const readline = require("readline-sync");
 const fetch = require("node-fetch");
+const crypto = require("crypto");
 
 process.stdout.write('\x1Bc');
 
@@ -8,9 +9,18 @@ function generateCode() {
   const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let code = "CA";
   for (let i = 0; i < 10; i++) {
-    code += charset.charAt(Math.floor(Math.random() * charset.length));
+    const rand = crypto.randomInt(0, charset.length);
+    code += charset[rand];
   }
   return code;
+}
+
+function generateUniqueCodes(total) {
+  const set = new Set();
+  while (set.size < total) {
+    set.add(generateCode());
+  }
+  return Array.from(set);
 }
 
 async function sendDiscordWebhook(webhookUrl, content, fields) {
@@ -52,7 +62,7 @@ async function checkCodeWithAPI(code) {
         "Accept": "application/json",
         "Origin": "https://vsvmos.androidmodvip.io.vn",
         "Referer": "https://vsvmos.androidmodvip.io.vn/checkcode.php",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/114.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0"
       },
       body: JSON.stringify({ code: code, type: "vmos" })
     });
@@ -96,7 +106,7 @@ async function main() {
     return;
   }
 
-  const codes = Array.from({ length: numCodes }, generateCode);
+  const codes = generateUniqueCodes(numCodes);
 
   for (let i = 0; i < codes.length; i += maxThreads) {
     const batch = codes.slice(i, i + maxThreads);
@@ -129,7 +139,7 @@ async function main() {
     );
   }
 
-  console.log("\n Done! Live codes saved to livecode.txt");
+  console.log(`\nDone! Live codes saved to livecode.txt. Total live code: ${liveCount}`);
 }
 
 main();
