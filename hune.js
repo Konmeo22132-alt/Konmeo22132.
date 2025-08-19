@@ -5,10 +5,12 @@
         themeColor: '#4a6bdf',
         bubbleIcon: 'https://raw.githubusercontent.com/Konmeo22132-alt/Konmeo22132./refs/heads/main/IMG_0005.webp',
         autoBtnText: 'Mua máy miễn phí',
-        autoBtnLink: 'https://huneipa.store',
+        autoBtnLink: 'https://discord.gg/fHdf4yXpVE',
         discordLink: 'https://discord.gg/ajTPkjY6tv',
         youtubeLink: 'https://www.youtube.com/@huneee205'
     };
+
+    const IS_VSPHONE = location.hostname.includes("cloud.vsphone.com");
 
     const root = document.createElement('div');
     const shadow = root.attachShadow({ mode: 'open' });
@@ -81,7 +83,7 @@
             resize: none; font-family: monospace;
             margin-bottom: 12px;
             background: rgba(255,255,255,0.14);
-            color: white;
+            color: ${IS_VSPHONE ? "black" : "white"};
         }
 
         .button-group {
@@ -98,6 +100,7 @@
         #submit:hover { background: #218838; transform: scale(1.04); }
         #logout { background: #dc3545; }
         #logout:hover { background: #c82333; transform: scale(1.04); }
+
         #auto-trial {
             width: 100%; background: rgba(243,156,18,0.85);
             color: white; font-weight: bold;
@@ -166,9 +169,11 @@
                 <div id="message"></div>
                 <textarea id="input" placeholder='Nhập nội dung Localstorage tại đây...'></textarea>
                 <div class="button-group">
-                    <button id="submit">Đăng nhập</button>
-                    <button id="logout">Đăng xuất</button>
+                    <button id="submit">${IS_VSPHONE ? "Copy Token" : "Đăng nhập"}</button>
+                    <button id="logout">${IS_VSPHONE ? "Copy Userid" : "Đăng xuất"}</button>
                 </div>
+
+                <!-- Nút "Mua máy miễn phí" luôn hiển thị cho cả 2 site -->
                 <button id="auto-trial">${config.autoBtnText}</button>
 
                 <div id="social-menu">
@@ -205,29 +210,59 @@
     closeModal.onclick = () => overlay.style.display = 'none';
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.style.display = 'none'; });
 
-    btnSubmit.onclick = () => {
-        const raw = txtInput.value.trim();
-        if (!raw) return message.innerText = 'Vui lòng nhập JSON hợp lệ!';
-        try {
-            const parsed = JSON.parse(raw);
+    if (!IS_VSPHONE) {
+        // ugphone
+        btnSubmit.onclick = () => {
+            const raw = txtInput.value.trim();
+            if (!raw) return message.innerText = 'Vui lòng nhập JSON hợp lệ!';
+            try {
+                const parsed = JSON.parse(raw);
+                localStorage.clear();
+                if (parsed.userFloatInfo) delete parsed.userFloatInfo;
+                for (let key in parsed) {
+                    localStorage.setItem(key, typeof parsed[key] === 'object' ? JSON.stringify(parsed[key]) : parsed[key]);
+                }
+                message.innerText = 'Vui lòng chờ...';
+                setTimeout(() => window.location.reload(), 800);
+            } catch (e) {
+                message.innerText = 'JSON không hợp lệ!';
+            }
+        };
+
+        btnLogout.onclick = () => {
             localStorage.clear();
-            if (parsed.userFloatInfo) delete parsed.userFloatInfo;
-            for (let key in parsed) localStorage.setItem(key, parsed[key]);
-            message.innerText = 'Vui lòng chờ...';
+            message.innerText = 'Đang đăng xuất...';
             setTimeout(() => window.location.reload(), 800);
-        } catch (e) {
-            message.innerText = 'JSON không hợp lệ!';
-            console.error('Lỗi parse JSON:', e);
-        }
-    };
+        };
 
-    btnLogout.onclick = () => {
-        localStorage.clear();
-        message.innerText = 'Đang đăng xuất...';
-        setTimeout(() => window.location.reload(), 800);
-    };
+        btnAuto.onclick = () => window.open(config.autoBtnLink, '_blank');
+    } else {
+        // vsphone
+        btnAuto.textContent = "Đăng xuất"; // log out khoi vs
 
-    btnAuto.onclick = () => window.open(config.autoBtnLink, '_blank');
+        const token = localStorage.getItem("token") || "token k ton tai, vui long dang nhap";
+        const userid = localStorage.getItem("userId") || "k tim thay usedid, vui long thu lai";
+        txtInput.value = `Token: ${token}\nUserid: ${userid}`;
+
+        btnSubmit.onclick = () => {
+            navigator.clipboard.writeText(token).then(() => {
+                message.innerText = "Da copy token";
+            });
+        };
+
+        btnLogout.onclick = () => {
+            navigator.clipboard.writeText(userid).then(() => {
+                message.innerText = "Đã copy userid";
+            });
+        };
+
+        btnAuto.onclick = () => {
+            localStorage.removeItem('token');
+            message.innerText = 'Đã đăng xuất';
+            setTimeout(() => window.location.reload(), 500);
+        };
+    }
+
     btnDiscord.onclick = () => window.open(config.discordLink, '_blank');
     btnYouTube.onclick = () => window.open(config.youtubeLink, '_blank');
 })();
