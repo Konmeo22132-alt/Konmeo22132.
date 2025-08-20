@@ -11,6 +11,7 @@
     };
 
     const IS_VSPHONE = location.hostname.includes("cloud.vsphone.com");
+    const IS_VMOS = location.hostname.includes("cloud.vmoscloud.com");
 
     const root = document.createElement('div');
     const shadow = root.attachShadow({ mode: 'open' });
@@ -83,7 +84,7 @@
             resize: none; font-family: monospace;
             margin-bottom: 12px;
             background: rgba(255,255,255,0.14);
-            color: ${IS_VSPHONE ? "black" : "white"};
+            color: ${(IS_VSPHONE || IS_VMOS) ? "black" : "white"};
         }
 
         .button-group {
@@ -169,8 +170,9 @@
                 <div id="message"></div>
                 <textarea id="input" placeholder='Nhập nội dung Localstorage tại đây...'></textarea>
                 <div class="button-group">
-                    <button id="submit">${IS_VSPHONE ? "Copy Token" : "Đăng nhập"}</button>
-                    <button id="logout">${IS_VSPHONE ? "Copy Userid" : "Đăng xuất"}</button>
+                  <button id="submit">${(IS_VSPHONE || IS_VMOS) ? "Copy Token" : "Đăng nhập"}</button>
+                  <button id="logout">${(IS_VSPHONE || IS_VMOS) ? "Copy Userid" : "Đăng xuất"}</button>
+
                 </div>
 
                 <!-- Nút "Mua máy miễn phí" luôn hiển thị cho cả 2 site -->
@@ -210,59 +212,60 @@
     closeModal.onclick = () => overlay.style.display = 'none';
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.style.display = 'none'; });
 
-    if (!IS_VSPHONE) {
-        // ugphone
-        btnSubmit.onclick = () => {
-            const raw = txtInput.value.trim();
-            if (!raw) return message.innerText = 'Vui lòng nhập JSON hợp lệ!';
-            try {
-                const parsed = JSON.parse(raw);
-                localStorage.clear();
-                if (parsed.userFloatInfo) delete parsed.userFloatInfo;
-                for (let key in parsed) {
-                    localStorage.setItem(key, typeof parsed[key] === 'object' ? JSON.stringify(parsed[key]) : parsed[key]);
-                }
-                message.innerText = 'Vui lòng chờ...';
-                setTimeout(() => window.location.reload(), 800);
-            } catch (e) {
-                message.innerText = 'JSON không hợp lệ!';
-            }
-        };
-
-        btnLogout.onclick = () => {
+if (!IS_VSPHONE && !IS_VMOS) {
+    // ugphone
+    btnSubmit.onclick = () => {
+        const raw = txtInput.value.trim();
+        if (!raw) return message.innerText = 'Vui lòng nhập JSON hợp lệ!';
+        try {
+            const parsed = JSON.parse(raw);
             localStorage.clear();
-            message.innerText = 'Đang đăng xuất...';
+            if (parsed.userFloatInfo) delete parsed.userFloatInfo;
+            for (let key in parsed) {
+                localStorage.setItem(key, typeof parsed[key] === 'object' ? JSON.stringify(parsed[key]) : parsed[key]);
+            }
+            message.innerText = 'Vui lòng chờ...';
             setTimeout(() => window.location.reload(), 800);
-        };
+        } catch (e) {
+            message.innerText = 'JSON không hợp lệ!';
+        }
+    };
 
-        btnAuto.onclick = () => window.open(config.autoBtnLink, '_blank');
-    } else {
-        // vsphone
-        btnAuto.textContent = "Đăng xuất"; // log out khoi vs
+    btnLogout.onclick = () => {
+        localStorage.clear();
+        message.innerText = 'Đang đăng xuất...';
+        setTimeout(() => window.location.reload(), 800);
+    };
 
-        const token = localStorage.getItem("token") || "token k ton tai, vui long dang nhap";
-        const userid = localStorage.getItem("userId") || "k tim thay usedid, vui long thu lai";
-        txtInput.value = `Token: ${token}\nUserid: ${userid}`;
+    btnAuto.onclick = () => window.open(config.autoBtnLink, '_blank');
 
-        btnSubmit.onclick = () => {
-            navigator.clipboard.writeText(token).then(() => {
-                message.innerText = "Da copy token";
-            });
-        };
+} else {
+    // vsphone hoặc vmos
+    btnAuto.textContent = "Đăng xuất"; // log out khoi vs/vmos
 
-        btnLogout.onclick = () => {
-            navigator.clipboard.writeText(userid).then(() => {
-                message.innerText = "Đã copy userid";
-            });
-        };
+    const token = localStorage.getItem("token") || "token k ton tai, vui long dang nhap";
+    const userid = localStorage.getItem("userId") || "k tim thay usedid, vui long thu lai";
+    txtInput.value = `Token: ${token}\nUserid: ${userid}`;
 
-        btnAuto.onclick = () => {
-            localStorage.removeItem('token');
-            message.innerText = 'Đã đăng xuất';
-            setTimeout(() => window.location.reload(), 500);
-        };
-    }
+    btnSubmit.onclick = () => {
+        navigator.clipboard.writeText(token).then(() => {
+            message.innerText = "Da copy token";
+        });
+    };
 
-    btnDiscord.onclick = () => window.open(config.discordLink, '_blank');
-    btnYouTube.onclick = () => window.open(config.youtubeLink, '_blank');
+    btnLogout.onclick = () => {
+        navigator.clipboard.writeText(userid).then(() => {
+            message.innerText = "Đã copy userid";
+        });
+    };
+
+    btnAuto.onclick = () => {
+        localStorage.removeItem('token');
+        message.innerText = 'Đã đăng xuất';
+        setTimeout(() => window.location.reload(), 500);
+    };
+}
+
+btnDiscord.onclick = () => window.open(config.discordLink, '_blank');
+btnYouTube.onclick = () => window.open(config.youtubeLink, '_blank');
 })();
