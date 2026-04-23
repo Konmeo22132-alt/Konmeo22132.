@@ -1,646 +1,772 @@
+/**
+ * XCloud AutoRenew Discord Bot
+ * Stack: discord.js v14, mongoose, axios, crypto, dotenv
+ */
+
 require('dotenv').config();
+
 const {
     Client, GatewayIntentBits, Partials,
     EmbedBuilder, ActionRowBuilder,
-    ButtonBuilder, ButtonStyle,
-    StringSelectMenuBuilder, ComponentType
+    StringSelectMenuBuilder, ComponentType,
+    REST, Routes
 } = require('discord.js');
 const mongoose = require('mongoose');
-const axios = require('axios');
-const crypto = require('crypto');
+const axios   = require('axios');
+const crypto  = require('crypto');
 
-// ================= CONFIG =================
-const OWNER_ID = process.env.OWNER_ID || "887855290479935578";
-const SECRET_KEY = crypto.createHash('sha256')
-    .update(process.env.SECRET_KEY || "default_secret")
-    .digest();
+// ─────────────────────────────────────────
+//  CONFIG
+// ─────────────────────────────────────────
+const OWNER_ID        = process.env.OWNER_ID   || '887855290479935578';
+const LINK4M_TOKEN    = process.env.LINK4M_TOKEN;
+const LANDING_BASE    = 'https://konmeo22132.vercel.app/';
+const XCLOUD_API      = 'https://api.xcloudphone.com';
 
-const RENEW_THRESHOLD_HOURS = parseFloat(process.env.RENEW_THRESHOLD || "4");
-const RENEW_ADD_HOURS = parseInt(process.env.RENEW_HOURS || "1");
-const WORKER_INTERVAL_MS = parseInt(process.env.WORKER_INTERVAL || "600000"); // 10 phút
+const SECRET_KEY = crypto
+    .createHash('sha256')
+    .update(process.env.SECRET_KEY || 'fallback_secret')
+    .digest(); // 32 bytes for AES-256
 
-const client = new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.DirectMessages],
-    partials: [Partials.Channel]
-});
-
-// ================= CRYPTO =================
+// ─────────────────────────────────────────
+//  CRYPTO UTILS
+// ─────────────────────────────────────────
 function encrypt(text) {
-    const iv = crypto.randomBytes(16);
+    const iv     = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv('aes-256-cbc', SECRET_KEY, iv);
-    let encrypted = cipher.update(text, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    return iv.toString('hex') + ':' + encrypted;
+    const enc    = cipher.update(text, 'utf8', 'hex') + cipher.final('hex');
+    return iv.toString('hex') + ':' + enc;
 }
 
 function decrypt(hash) {
-    const [ivHex, encrypted] = hash.split(':');
-    const iv = Buffer.from(ivHex, 'hex');
-    const decipher = crypto.createDecipheriv('aes-256-cbc', SECRET_KEY, iv);
-    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
+    const [ivHex, enc] = hash.split(':');
+    const decipher = crypto.createDecipheriv(
+        'aes-256-cbc', SECRET_KEY, Buffer.from(ivHex, 'hex')
+    );
+    return decipher.update(enc, 'hex', 'utf8') + decipher.final('utf8');
 }
 
-// ================= MODEL =================
+// ─────────────────────────────────────────
+//  MONGOOSE SCHEMA
+// ─────────────────────────────────────────
+const pendingCodeSchema = new mongoose.Schema({
+    code:      { type: String, required: true },
+    createdAt: { type: Date,   default: Date.now, expires: 3600 } // TTL 1 hour
+});
+
 const userSchema = new mongoose.Schema({
     discordId: { type: String, required: true, unique: true },
-    xcloudUsername: String,
-    xcloudPassword: String, // AES encrypted
 
     xcloud: {
-        accessToken: String,
+        username:     String,
+        password:     String, // AES-256 encrypted
+        accessToken:  String,
         refreshToken: String,
+        lastLoginAt:  Date,
     },
-    lastLoginAt: Date,
 
-    autoRenew: {
-        enabled: { type: Boolean, default: false },
-        sessionIds: [String], // danh sách session được chọn, [] = tất cả
-        thresholdHours: { type: Number, default: RENEW_THRESHOLD_HOURS },
-        renewHours: { type: Number, default: RENEW_ADD_HOURS },
-        totalRenewed: { type: Number, default: 0 },
-        lastRenewedAt: Date,
-        lastError: String,
-    }
+    credits:       { type: Number, default: 0 },
+    nextDeduction: Date,
+
+    usage: {
+        linksRedeemedToday: { type: Number,  default: 0 },
+        lastRedeemDate:     { type: String,  default: '' }, // YYYY-MM-DD
+    },
+
+    autoDevice: {
+        sessionId:  String,
+        deviceName: String,
+        isEnabled:  { type: Boolean, default: false },
+    },
+
+    pendingCodes: [pendingCodeSchema],
 });
 
 const User = mongoose.model('User', userSchema);
 
-// ================= XCLOUD API =================
-const API = 'https://api.xcloudphone.com';
-const HEADERS_BASE = {
-    'Origin': 'https://app.xcloudphone.com',
-    'Referer': 'https://app.xcloudphone.com/',
-    'Accept': 'application/json',
+// ─────────────────────────────────────────
+//  XCLOUD API HELPERS
+// ─────────────────────────────────────────
+const XCLOUD_HEADERS = {
+    'Origin':          'https://app.xcloudphone.com',
+    'Referer':         'https://app.xcloudphone.com/',
+    'Accept':          'application/json',
     'Accept-Language': 'vi-VN',
-    'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36',
+    'User-Agent':      'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36',
 };
 
-function makeCookie(at, rt) {
+/** Parse renterAccessToken & renterRefreshToken from Set-Cookie header array */
+function extractCookies(setCookieArray) {
+    let accessToken = null, refreshToken = null;
+    for (const cookie of (setCookieArray || [])) {
+        const [kv] = cookie.split(';');
+        const eqIdx = kv.indexOf('=');
+        const k = kv.slice(0, eqIdx).trim();
+        const v = kv.slice(eqIdx + 1).trim();
+        if (k === 'renterAccessToken')  accessToken  = v;
+        if (k === 'renterRefreshToken') refreshToken = v;
+    }
+    return { accessToken, refreshToken };
+}
+
+function cookieString(at, rt) {
     const parts = [];
     if (at) parts.push(`renterAccessToken=${at}`);
     if (rt) parts.push(`renterRefreshToken=${rt}`);
     return parts.join('; ');
 }
 
-function extractCookies(setCookieArray) {
-    let accessToken = null, refreshToken = null;
-    for (const cookie of setCookieArray || []) {
-        const [kv] = cookie.split(';');
-        const [k, v] = kv.trim().split('=');
-        if (k === 'renterAccessToken') accessToken = v;
-        if (k === 'renterRefreshToken') refreshToken = v;
-    }
-    return { accessToken, refreshToken };
-}
-
-function parseJWT(token) {
-    try {
-        const b = token.split('.')[1];
-        const padded = b + '='.repeat((4 - b.length % 4) % 4);
-        return JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
-    } catch { return null; }
-}
-
-function tokenExpiresIn(token) {
-    const p = parseJWT(token);
-    if (!p?.exp) return null;
-    return p.exp * 1000 - Date.now(); // ms
-}
-
-// ── Login ──
-async function loginXcloud(username, password) {
-    const userDeviceId = crypto.randomUUID();
+/**
+ * Login to XCloud. Returns { accessToken, refreshToken }.
+ * Tokens come from Set-Cookie header.
+ */
+async function xcloudLogin(username, password) {
     const res = await axios.post(
-        `${API}/auth/renters/login`,
-        { username, password, userDeviceId },
-        { headers: HEADERS_BASE, validateStatus: () => true }
+        `${XCLOUD_API}/auth/renters/login`,
+        { username, password, userDeviceId: crypto.randomUUID() },
+        { headers: { ...XCLOUD_HEADERS, 'Content-Type': 'application/json' }, validateStatus: () => true }
     );
 
     if (res.status === 400 || res.status === 401) throw new Error('INVALID_CREDENTIALS');
 
-    const cookies = res.headers['set-cookie'];
-    const { accessToken, refreshToken } = extractCookies(cookies);
+    const { accessToken, refreshToken } = extractCookies(res.headers['set-cookie']);
+    if (!accessToken || !refreshToken)  throw new Error('TOKEN_NOT_FOUND');
 
-    // Một số server trả token trong body thay vì cookie
-    const at = accessToken || res.data?.accessToken || res.data?.data?.accessToken;
-    const rt = refreshToken || res.data?.refreshToken || res.data?.data?.refreshToken;
-
-    if (!at || !rt) throw new Error('TOKEN_NOT_FOUND');
-    return { accessToken: at, refreshToken: rt };
+    return { accessToken, refreshToken };
 }
 
-// ── Refresh token ──
-async function refreshAccessToken(user) {
-    const rt = user.xcloud?.refreshToken;
-    if (!rt) throw new Error('NO_REFRESH_TOKEN');
+/**
+ * Fetch active rental sessions for a user.
+ * Returns array of { sessionId, deviceName, remainingMs }
+ * ALWAYS fetches fresh from API — never trusts cached device.
+ */
+async function xcloudGetSessions(accessToken) {
+    const res = await axios.get(
+        `${XCLOUD_API}/renters/rental-sessions?page=1&limit=20`,
+        {
+            headers: {
+                ...XCLOUD_HEADERS,
+                'Cookie': `renterAccessToken=${accessToken}`,
+            },
+            validateStatus: () => true,
+        }
+    );
 
-    const endpoints = [
-        '/auth/refresh',
-        '/auth/renters/refresh',
-        '/renters/refresh',
-        '/auth/refresh-token',
-    ];
+    if (res.status === 401) throw new Error('TOKEN_EXPIRED');
+    if (res.status !== 200) throw new Error(`GET_SESSIONS_${res.status}`);
 
-    for (const path of endpoints) {
-        try {
-            const res = await axios.post(`${API}${path}`,
-                { refreshToken: rt },
-                {
-                    headers: {
-                        ...HEADERS_BASE,
-                        'Content-Type': 'application/json',
-                        'Cookie': makeCookie(null, rt),
-                    },
-                    validateStatus: () => true
-                }
-            );
-
-            // Lấy token từ body
-            const na = res.data?.accessToken || res.data?.renterAccessToken || res.data?.data?.accessToken;
-            if (na) {
-                user.xcloud.accessToken = na;
-                await user.save();
-                return na;
-            }
-
-            // Lấy từ Set-Cookie
-            const { accessToken } = extractCookies(res.headers['set-cookie']);
-            if (accessToken) {
-                user.xcloud.accessToken = accessToken;
-                await user.save();
-                return accessToken;
-            }
-        } catch {}
-    }
-
-    // Fallback: re-login nếu có username/password
-    if (user.xcloudUsername && user.xcloudPassword) {
-        const password = decrypt(user.xcloudPassword);
-        const { accessToken, refreshToken } = await loginXcloud(user.xcloudUsername, password);
-        user.xcloud = { accessToken, refreshToken };
-        user.lastLoginAt = new Date();
-        await user.save();
-        return accessToken;
-    }
-
-    throw new Error('REFRESH_FAILED');
-}
-
-// ── Ensure valid access token ──
-async function ensureToken(user) {
-    const at = user.xcloud?.accessToken;
-    if (!at) return await refreshAccessToken(user);
-
-    const msLeft = tokenExpiresIn(at);
-    if (msLeft !== null && msLeft < 3 * 60 * 1000) {
-        return await refreshAccessToken(user);
-    }
-    return at;
-}
-
-// ── Get rental sessions ──
-async function getRentalSessions(user) {
-    const at = await ensureToken(user);
-    const rt = user.xcloud?.refreshToken;
-
-    const paths = [
-        '/renters/rental-sessions?page=1&limit=50&sortBy=startTime&sortOrder=desc',
-        '/rentals',
-    ];
-
-    for (const path of paths) {
-        try {
-            const res = await axios.get(`${API}${path}`, {
-                headers: {
-                    ...HEADERS_BASE,
-                    'Cookie': makeCookie(at, rt),
-                },
-                validateStatus: () => true
-            });
-
-            if (res.status === 401) {
-                // Retry after refresh
-                const newAt = await refreshAccessToken(user);
-                const res2 = await axios.get(`${API}${path}`, {
-                    headers: { ...HEADERS_BASE, 'Cookie': makeCookie(newAt, rt) },
-                    validateStatus: () => true
-                });
-                if (res2.status !== 200) continue;
-                return normalizeSessions(res2.data);
-            }
-
-            if (res.status !== 200) continue;
-            return normalizeSessions(res.data);
-        } catch {}
-    }
-
-    throw new Error('CANNOT_FETCH_SESSIONS');
-}
-
-function normalizeSessions(data) {
-    const raw = Array.isArray(data) ? data
-        : (data?.data || data?.items || data?.rentals || data?.rentalSessions || data?.result || []);
+    const raw = Array.isArray(res.data) ? res.data
+        : (res.data?.data || res.data?.items || res.data?.rentalSessions || res.data?.result || []);
 
     return raw
         .filter(x => {
-            const s = x.status || x.rentalStatus || '';
+            const s = (x.status || x.rentalStatus || '').toLowerCase();
             return s !== 'expired' && s !== 'cancelled';
         })
         .map(x => {
-            const sessionId = x.id || x.sessionId || x.rentalSessionId || x.rentalId;
-            const name = x.deviceName || x.name || x.device?.name || x.device?.model || x.phoneName || 'Unknown';
-            let remainingMs = 0;
-            if (x.remainingTime != null) remainingMs = x.remainingTime * 1000;
-            else if (x.remainingSeconds) remainingMs = x.remainingSeconds * 1000;
-            else if (x.remainingMinutes) remainingMs = x.remainingMinutes * 60000;
+            const sessionId   = x.id || x.sessionId || x.rentalSessionId;
+            const deviceName  = x.deviceName || x.name || x.device?.name || x.device?.model || 'Unknown';
+            let remainingMs   = 0;
+            if (x.remainingTime   != null) remainingMs = x.remainingTime   * 1000;
+            else if (x.remainingSeconds)   remainingMs = x.remainingSeconds * 1000;
+            else if (x.remainingMinutes)   remainingMs = x.remainingMinutes * 60000;
             else {
                 const exp = x.expiresAt || x.expiredAt || x.endTime || x.endAt;
                 if (exp) remainingMs = new Date(exp).getTime() - Date.now();
             }
-            return { sessionId, name, remainingMs: Math.max(0, remainingMs) };
+            return { sessionId, deviceName, remainingMs: Math.max(0, remainingMs) };
         });
 }
 
-// ── Renew session ──
-async function renewSession(user, sessionId, hours = 1) {
-    const at = await ensureToken(user);
-    const rt = user.xcloud?.refreshToken;
-
-    const res = await axios.post(`${API}/rentals/extend`,
+/** Extend a rental session by `hours` hours. */
+async function xcloudExtend(accessToken, sessionId, hours = 1) {
+    const res = await axios.post(
+        `${XCLOUD_API}/rentals/extend`,
         { listSessionId: [sessionId], rentalHours: hours },
         {
             headers: {
-                ...HEADERS_BASE,
+                ...XCLOUD_HEADERS,
                 'Content-Type': 'application/json',
-                'Cookie': makeCookie(at, rt),
+                'Cookie': `renterAccessToken=${accessToken}`,
             },
-            validateStatus: () => true
+            validateStatus: () => true,
         }
     );
-
-    if (res.status === 401) {
-        await refreshAccessToken(user);
-        const newAt = user.xcloud.accessToken;
-        const res2 = await axios.post(`${API}/rentals/extend`,
-            { listSessionId: [sessionId], rentalHours: hours },
-            { headers: { ...HEADERS_BASE, 'Content-Type': 'application/json', 'Cookie': makeCookie(newAt, rt) }, validateStatus: () => true }
-        );
-        if (res2.status !== 200 && res2.status !== 201) throw new Error(`HTTP ${res2.status}`);
-        return res2.data;
-    }
-
-    if (res.status !== 200 && res.status !== 201) throw new Error(`HTTP ${res.status}`);
+    if (res.status === 401) throw new Error('TOKEN_EXPIRED');
+    if (res.status !== 200 && res.status !== 201) throw new Error(`EXTEND_${res.status}`);
     return res.data;
 }
 
-// ── Auto relogin every 5 days ──
-async function autoReloginIfNeeded(user) {
-    const FIVE_DAYS = 5 * 24 * 60 * 60 * 1000;
-    if (!user.lastLoginAt) return;
-    if (Date.now() - user.lastLoginAt.getTime() < FIVE_DAYS) return;
-    if (!user.xcloudUsername || !user.xcloudPassword) return;
-
-    try {
-        const password = decrypt(user.xcloudPassword);
-        const { accessToken, refreshToken } = await loginXcloud(user.xcloudUsername, password);
-        user.xcloud = { accessToken, refreshToken };
-        user.lastLoginAt = new Date();
-        await user.save();
-        console.log(`[AutoRelogin] ${user.discordId} OK`);
-    } catch (err) {
-        if (err.message === 'INVALID_CREDENTIALS') {
-            user.autoRenew.enabled = false;
-            await user.save();
-            try {
-                const u = await client.users.fetch(user.discordId);
-                await u.send('⚠️ Tài khoản XCloud không còn hợp lệ. Vui lòng dùng `/config` để cập nhật lại.');
-            } catch {}
-        } else throw err;
-    }
+// ─────────────────────────────────────────
+//  LINK4M
+// ─────────────────────────────────────────
+async function shortenLink4m(url) {
+    const res = await axios.get('https://link4m.co/api-shorten/v2', {
+        params: { api: LINK4M_TOKEN, url },
+        validateStatus: () => true,
+    });
+    if (res.data?.status === 'success') return res.data.shortenedUrl;
+    throw new Error('LINK4M_FAILED');
 }
 
-// ================= WORKER =================
+// ─────────────────────────────────────────
+//  DISCORD CLIENT
+// ─────────────────────────────────────────
+const client = new Client({
+    intents:  [GatewayIntentBits.Guilds, GatewayIntentBits.DirectMessages],
+    partials: [Partials.Channel],
+});
+
+// ─────────────────────────────────────────
+//  EMBED HELPERS  (no emojis as per spec)
+// ─────────────────────────────────────────
+const COLOR = { ok: 0x23d18b, err: 0xff5e5e, info: 0x5b6af5, warn: 0xf5c542 };
+
+function embed(color, title, description, fields = []) {
+    const e = new EmbedBuilder()
+        .setColor(color)
+        .setTitle(title)
+        .setTimestamp();
+    if (description) e.setDescription(description);
+    if (fields.length) e.addFields(fields);
+    return e;
+}
+
+// ─────────────────────────────────────────
+//  BACKGROUND WORKER
+// ─────────────────────────────────────────
 async function autoRenewWorker() {
-    const users = await User.find({ 'autoRenew.enabled': true });
-    console.log(`[Worker] Checking ${users.length} users...`);
+    const users = await User.find({
+        'autoDevice.isEnabled': true,
+        credits: { $gt: 0 },
+    });
+
+    console.log(`[Worker] Processing ${users.length} active user(s)...`);
 
     for (const user of users) {
         try {
-            await autoReloginIfNeeded(user);
-
-            const sessions = await getRentalSessions(user);
-            const thresh = user.autoRenew.thresholdHours;
-            const addHours = user.autoRenew.renewHours;
-
-            // Lọc session cần gia hạn
-            const toRenew = sessions.filter(s => {
-                const withinThresh = s.remainingMs > 0 && s.remainingMs / 3600000 <= thresh;
-                // Nếu có danh sách sessionIds cụ thể thì chỉ gia hạn những cái đó
-                if (user.autoRenew.sessionIds?.length > 0) {
-                    return withinThresh && user.autoRenew.sessionIds.includes(s.sessionId);
-                }
-                return withinThresh;
-            });
-
-            if (!toRenew.length) continue;
-
-            const results = [];
-            for (const s of toRenew) {
+            // ── 1. Auto re-login every 5 days ──────────────────────────────
+            const FIVE_DAYS = 5 * 24 * 60 * 60 * 1000;
+            if (user.xcloud?.lastLoginAt && Date.now() - user.xcloud.lastLoginAt.getTime() >= FIVE_DAYS) {
                 try {
-                    await renewSession(user, s.sessionId, addHours);
-                    results.push(`✅ **${s.name}** +${addHours}h`);
-                    user.autoRenew.totalRenewed++;
-                } catch (e) {
-                    results.push(`❌ **${s.name}**: ${e.message}`);
+                    const password = decrypt(user.xcloud.password);
+                    const { accessToken, refreshToken } = await xcloudLogin(user.xcloud.username, password);
+                    user.xcloud.accessToken  = accessToken;
+                    user.xcloud.refreshToken = refreshToken;
+                    user.xcloud.lastLoginAt  = new Date();
+                    console.log(`[Worker] Re-login OK: ${user.discordId}`);
+                } catch (loginErr) {
+                    if (loginErr.message === 'INVALID_CREDENTIALS') {
+                        user.autoDevice.isEnabled = false;
+                        await user.save();
+                        try {
+                            const u = await client.users.fetch(user.discordId);
+                            await u.send({
+                                embeds: [embed(COLOR.err, 'Auto-Renew Stopped',
+                                    'Your XCloud credentials are no longer valid. Please use /login to update them.'
+                                )]
+                            });
+                        } catch {}
+                        continue;
+                    }
+                    throw loginErr;
                 }
             }
 
-            user.autoRenew.lastRenewedAt = new Date();
-            user.autoRenew.lastError = null;
-            await user.save();
+            // ── 2. Credit deduction ────────────────────────────────────────
+            if (!user.nextDeduction || Date.now() >= user.nextDeduction.getTime()) {
+                user.credits -= 1;
+                user.nextDeduction = new Date(Date.now() + 8 * 3600 * 1000);
 
-            // Notify user
+                if (user.credits <= 0) {
+                    user.credits = 0;
+                    user.autoDevice.isEnabled = false;
+                    await user.save();
+                    try {
+                        const u = await client.users.fetch(user.discordId);
+                        await u.send({
+                            embeds: [embed(COLOR.warn, 'Auto-Renew Stopped',
+                                'Your credits have been exhausted. Use /get credit to obtain more.'
+                            )]
+                        });
+                    } catch {}
+                    continue;
+                }
+            }
+
+            // ── 3. Auto-renew: ALWAYS re-fetch sessions from API ──────────
+            // Never trust the cached sessionId alone — device may have been deleted.
+            let sessions;
             try {
-                const discordUser = await client.users.fetch(user.discordId);
-                const embed = new EmbedBuilder()
-                    .setColor(0x5b6af5)
-                    .setTitle('☁ XCloud AutoRenew')
-                    .setDescription(results.join('\n'))
-                    .setFooter({ text: `Tổng đã gia hạn: ${user.autoRenew.totalRenewed} lần` })
-                    .setTimestamp();
-                await discordUser.send({ embeds: [embed] });
-            } catch {}
+                sessions = await xcloudGetSessions(user.xcloud.accessToken);
+            } catch (e) {
+                if (e.message === 'TOKEN_EXPIRED') {
+                    // Try re-login
+                    const password = decrypt(user.xcloud.password);
+                    const tokens = await xcloudLogin(user.xcloud.username, password);
+                    user.xcloud.accessToken  = tokens.accessToken;
+                    user.xcloud.refreshToken = tokens.refreshToken;
+                    user.xcloud.lastLoginAt  = new Date();
+                    sessions = await xcloudGetSessions(user.xcloud.accessToken);
+                } else {
+                    throw e;
+                }
+            }
+
+            // Verify the saved device still exists in the live session list
+            const activeSession = sessions.find(s => s.sessionId === user.autoDevice.sessionId);
+
+            if (!activeSession) {
+                // Device no longer exists — disable auto-renew silently
+                console.log(`[Worker] Device not found for ${user.discordId}, disabling.`);
+                user.autoDevice.isEnabled = false;
+                await user.save();
+                continue;
+            }
+
+            // Renew if remaining time <= 4 hours
+            const FOUR_HOURS = 4 * 3600 * 1000;
+            if (activeSession.remainingMs <= FOUR_HOURS) {
+                await xcloudExtend(user.xcloud.accessToken, activeSession.sessionId, 1);
+                console.log(`[Worker] Renewed "${activeSession.deviceName}" for ${user.discordId}`);
+                // No DM on success per spec
+            }
+
+            await user.save();
 
         } catch (err) {
             console.error(`[Worker] Error for ${user.discordId}:`, err.message);
-            user.autoRenew.lastError = err.message;
-            await user.save();
-
             try {
                 const owner = await client.users.fetch(OWNER_ID);
-                await owner.send(`⚠️ Worker error (${user.discordId}):\n\`\`\`${err.stack}\`\`\``);
+                await owner.send(`**Worker Error** (${user.discordId})\n\`\`\`\n${err.stack?.slice(0, 1800)}\n\`\`\``);
             } catch {}
         }
     }
 }
 
-// ================= EMBEDS =================
-function embedSuccess(title, desc) {
-    return new EmbedBuilder().setColor(0x23d18b).setTitle(`✅ ${title}`).setDescription(desc).setTimestamp();
-}
-function embedError(title, desc) {
-    return new EmbedBuilder().setColor(0xff5e5e).setTitle(`❌ ${title}`).setDescription(desc).setTimestamp();
-}
-function embedInfo(title, desc) {
-    return new EmbedBuilder().setColor(0x5b6af5).setTitle(`☁ ${title}`).setDescription(desc).setTimestamp();
-}
-function fmtMs(ms) {
-    if (ms <= 0) return '⛔ Hết hạn';
-    const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
-    if (h > 4) return `🟢 ${h}g ${m}p`;
-    if (h >= 1) return `🟡 ${h}g ${m}p`;
-    return `🔴 ${m}p`;
-}
-
-// ================= COMMANDS =================
+// ─────────────────────────────────────────
+//  INTERACTION HANDLER
+// ─────────────────────────────────────────
 client.on('interactionCreate', async interaction => {
+    if (!interaction.isChatInputCommand() && !interaction.isStringSelectMenu()) return;
+
+    // ── Select Menu: device selection ──────────────────────────────────────
+    if (interaction.isStringSelectMenu() && interaction.customId === 'select_device') {
+        try {
+            const user = await User.findOne({ discordId: interaction.user.id });
+            if (!user) return interaction.update({ content: 'User not found.', components: [] });
+
+            const [sessionId, deviceName] = interaction.values[0].split('||');
+            user.autoDevice = { sessionId, deviceName, isEnabled: true };
+
+            // If user has credits but nextDeduction was never set, initialise it
+            if (user.credits > 0 && !user.nextDeduction) {
+                user.nextDeduction = new Date(Date.now() + 8 * 3600 * 1000);
+            }
+
+            await user.save();
+            await interaction.update({
+                embeds: [embed(COLOR.ok, 'Device Selected',
+                    `Auto-renew has been activated for **${deviceName}**.\nCredits remaining: **${user.credits}** (${user.credits * 8} hours).`
+                )],
+                components: [],
+            });
+        } catch (err) {
+            console.error('[SelectMenu]', err);
+            await interaction.update({ content: 'An error occurred.', components: [] }).catch(() => {});
+        }
+        return;
+    }
+
     if (!interaction.isChatInputCommand()) return;
 
-    const safeRun = async (fn) => {
+    // Fetch or create user document
+    let user = await User.findOneAndUpdate(
+        { discordId: interaction.user.id },
+        { $setOnInsert: { discordId: interaction.user.id } },
+        { upsert: true, new: true }
+    );
+
+    const cmd = interaction.commandName;
+
+    // ── Safe runner ──────────────────────────────────────────────────────
+    const safe = async (fn) => {
         try {
             await fn();
         } catch (err) {
-            console.error(`[CMD:${interaction.commandName}]`, err);
-            const msg = { embeds: [embedError('Lỗi', 'Có lỗi xảy ra. Vui lòng thử lại.')], ephemeral: true };
+            console.error(`[CMD:${cmd}]`, err);
+            const payload = {
+                embeds: [embed(COLOR.err, 'Internal Error', 'An error occurred. Please try again later.')],
+                ephemeral: true,
+            };
             if (interaction.deferred || interaction.replied) {
-                await interaction.editReply(msg).catch(() => {});
+                await interaction.editReply(payload).catch(() => {});
             } else {
-                await interaction.reply(msg).catch(() => {});
+                await interaction.reply(payload).catch(() => {});
             }
             try {
                 const owner = await client.users.fetch(OWNER_ID);
-                await owner.send(`❗ CMD Error [${interaction.commandName}]:\n\`\`\`${err.stack?.slice(0, 1500)}\`\`\``);
+                await owner.send(`**CMD Error** [/${cmd}] (${interaction.user.id})\n\`\`\`\n${err.stack?.slice(0, 1800)}\n\`\`\``);
             } catch {}
         }
     };
 
-    let user = await User.findOne({ discordId: interaction.user.id });
-    if (!user) user = await User.create({ discordId: interaction.user.id });
-
-    // ── /config ──
-    if (interaction.commandName === 'config') {
-        await safeRun(async () => {
+    // ════════════════════════════════════════
+    //  /login [username] [password]
+    // ════════════════════════════════════════
+    if (cmd === 'login') {
+        await safe(async () => {
             await interaction.deferReply({ ephemeral: true });
+
             const username = interaction.options.getString('username');
             const password = interaction.options.getString('password');
 
-            const { accessToken, refreshToken } = await loginXcloud(username, password);
+            try {
+                const { accessToken, refreshToken } = await xcloudLogin(username, password);
 
-            user.xcloudUsername = username;
-            user.xcloudPassword = encrypt(password);
-            user.xcloud = { accessToken, refreshToken };
-            user.lastLoginAt = new Date();
-            await user.save();
+                user.xcloud = {
+                    username,
+                    password:     encrypt(password),
+                    accessToken,
+                    refreshToken,
+                    lastLoginAt:  new Date(),
+                };
+                await user.save();
 
-            await interaction.editReply({
-                embeds: [embedSuccess('Đăng nhập thành công', `Tài khoản \`${username}\` đã được lưu.\nToken sẽ tự động làm mới.`)]
-            });
-        });
-    }
-
-    // ── /devices ──
-    else if (interaction.commandName === 'devices') {
-        await safeRun(async () => {
-            await interaction.deferReply({ ephemeral: true });
-            if (!user.xcloud?.accessToken) {
-                return interaction.editReply({ embeds: [embedError('Chưa đăng nhập', 'Dùng `/config` để đăng nhập trước.')] });
-            }
-
-            const sessions = await getRentalSessions(user);
-            if (!sessions.length) {
-                return interaction.editReply({ embeds: [embedInfo('Thiết bị', 'Không có thiết bị đang thuê.')] });
-            }
-
-            const lines = sessions.map((s, i) =>
-                `**${i + 1}.** ${s.name}\n> ${fmtMs(s.remainingMs)}\n> \`${s.sessionId}\``
-            );
-
-            await interaction.editReply({
-                embeds: [embedInfo(`Thiết bị (${sessions.length})`, lines.join('\n\n'))]
-            });
-        });
-    }
-
-    // ── /renew ──
-    else if (interaction.commandName === 'renew') {
-        await safeRun(async () => {
-            await interaction.deferReply({ ephemeral: true });
-            if (!user.xcloud?.accessToken) {
-                return interaction.editReply({ embeds: [embedError('Chưa đăng nhập', 'Dùng `/config` trước.')] });
-            }
-
-            const hours = interaction.options.getInteger('hours') || 1;
-            const sessions = await getRentalSessions(user);
-
-            if (!sessions.length) {
-                return interaction.editReply({ embeds: [embedInfo('Gia hạn', 'Không có thiết bị nào.')] });
-            }
-
-            const results = [];
-            for (const s of sessions) {
-                try {
-                    await renewSession(user, s.sessionId, hours);
-                    results.push(`✅ **${s.name}** +${hours}h`);
-                    user.autoRenew.totalRenewed++;
-                } catch (e) {
-                    results.push(`❌ **${s.name}**: ${e.message}`);
+                await interaction.editReply({
+                    embeds: [embed(COLOR.ok, 'Login Successful',
+                        `Credentials for **${username}** have been saved and verified.`
+                    )]
+                });
+            } catch (err) {
+                if (err.message === 'INVALID_CREDENTIALS') {
+                    return interaction.editReply({
+                        embeds: [embed(COLOR.err, 'Login Failed', 'Invalid username or password.')]
+                    });
                 }
+                throw err;
             }
-            await user.save();
-
-            await interaction.editReply({
-                embeds: [embedInfo('Kết quả gia hạn', results.join('\n'))]
-            });
         });
     }
 
-    // ── /auto ──
-    else if (interaction.commandName === 'auto') {
-        await safeRun(async () => {
+    // ════════════════════════════════════════
+    //  /get credit
+    // ════════════════════════════════════════
+    else if (cmd === 'get' && interaction.options.getSubcommand() === 'credit') {
+        await safe(async () => {
             await interaction.deferReply({ ephemeral: true });
-            if (!user.xcloud?.accessToken) {
-                return interaction.editReply({ embeds: [embedError('Chưa đăng nhập', 'Dùng `/config` trước.')] });
+
+            // Reset daily counter if date changed
+            const today = new Date().toISOString().slice(0, 10);
+            if (user.usage.lastRedeemDate !== today) {
+                user.usage.linksRedeemedToday = 0;
+                user.usage.lastRedeemDate     = today;
             }
 
-            const sub = interaction.options.getSubcommand();
-
-            if (sub === 'on') {
-                const thresh = interaction.options.getNumber('threshold') || RENEW_THRESHOLD_HOURS;
-                const hours = interaction.options.getInteger('hours') || RENEW_ADD_HOURS;
-                user.autoRenew.enabled = true;
-                user.autoRenew.thresholdHours = thresh;
-                user.autoRenew.renewHours = hours;
-                await user.save();
-                await interaction.editReply({
-                    embeds: [embedSuccess('Auto Renew BẬT', `Ngưỡng: **${thresh}h** | Gia hạn: **+${hours}h**\nBot sẽ tự gia hạn khi thiết bị còn dưới ${thresh} giờ.`)]
-                });
-            }
-
-            else if (sub === 'off') {
-                user.autoRenew.enabled = false;
-                await user.save();
-                await interaction.editReply({
-                    embeds: [embedInfo('Auto Renew TẮT', 'Đã tắt tự động gia hạn.')]
-                });
-            }
-
-            else if (sub === 'status') {
-                const ar = user.autoRenew;
-                const statusStr = ar.enabled ? '🟢 **BẬT**' : '🔴 **TẮT**';
-                const lastRenew = ar.lastRenewedAt ? `<t:${Math.floor(ar.lastRenewedAt.getTime() / 1000)}:R>` : 'Chưa có';
-                const lastErr = ar.lastError ? `\n⚠️ Lỗi cuối: \`${ar.lastError}\`` : '';
-
-                await interaction.editReply({
-                    embeds: [embedInfo('Trạng thái Auto Renew',
-                        `Trạng thái: ${statusStr}\n` +
-                        `Ngưỡng: **${ar.thresholdHours}h** | Gia hạn thêm: **+${ar.renewHours}h**\n` +
-                        `Tổng đã gia hạn: **${ar.totalRenewed}** lần\n` +
-                        `Lần cuối: ${lastRenew}${lastErr}`
+            if (user.usage.linksRedeemedToday >= 3) {
+                return interaction.editReply({
+                    embeds: [embed(COLOR.warn, 'Daily Limit Reached',
+                        'You have reached the maximum of 3 links per day. Please try again tomorrow.'
                     )]
                 });
             }
+
+            // Generate code
+            const code    = 'XC-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+            const b64Code = Buffer.from(code).toString('base64');
+            const pageUrl = `${LANDING_BASE}?keyname=${encodeURIComponent(b64Code)}`;
+
+            let finalUrl = pageUrl;
+            try {
+                finalUrl = await shortenLink4m(pageUrl);
+            } catch {
+                // If Link4m fails, fall back to direct URL
+            }
+
+            // Save pending code (TTL will auto-expire in 1 hour)
+            user.pendingCodes.push({ code, createdAt: new Date() });
+            user.usage.linksRedeemedToday++;
+            user.usage.lastRedeemDate = today;
+            await user.save();
+
+            await interaction.editReply({
+                embeds: [embed(COLOR.info, 'Credit Link Generated',
+                    `Complete the task at the link below, then use **/redeem** with your code.\n\n**Link:** ${finalUrl}\n\nLinks used today: **${user.usage.linksRedeemedToday}/3**`
+                )]
+            });
         });
     }
 
-    // ── /status ──
-    else if (interaction.commandName === 'status') {
-        await safeRun(async () => {
+    // ════════════════════════════════════════
+    //  /redeem [code]
+    // ════════════════════════════════════════
+    else if (cmd === 'redeem') {
+        await safe(async () => {
             await interaction.deferReply({ ephemeral: true });
-            if (!user.xcloud?.accessToken) {
-                return interaction.editReply({ embeds: [embedError('Chưa đăng nhập', 'Dùng `/config` trước.')] });
+
+            const code     = interaction.options.getString('code').trim().toUpperCase();
+            const today    = new Date().toISOString().slice(0, 10);
+            const codeIdx  = user.pendingCodes.findIndex(p => p.code === code);
+
+            if (codeIdx === -1) {
+                return interaction.editReply({
+                    embeds: [embed(COLOR.err, 'Invalid Code', 'The code does not exist or has expired.')]
+                });
             }
 
-            const at = user.xcloud.accessToken;
-            const rt = user.xcloud.refreshToken;
-            const atMs = tokenExpiresIn(at);
-            const rtMs = rt ? tokenExpiresIn(rt) : null;
+            // Remove code
+            user.pendingCodes.splice(codeIdx, 1);
 
-            function fmtToken(ms) {
-                if (ms === null) return '❓ Không rõ';
-                if (ms <= 0) return '🔴 Hết hạn';
-                const m = Math.floor(ms / 60000), h = Math.floor(m / 60), d = Math.floor(h / 24);
-                if (d > 0) return `🟢 ${d} ngày ${h % 24}g`;
-                if (h > 0) return `🟡 ${h}g ${m % 60}p`;
-                return `🔴 ${m}p`;
+            // Add 1 credit
+            user.credits++;
+
+            // Reset nextDeduction timer if this is the first credit
+            if (!user.nextDeduction || user.credits === 1) {
+                user.nextDeduction = new Date(Date.now() + 8 * 3600 * 1000);
+            }
+
+            // Update usage
+            if (user.usage.lastRedeemDate !== today) {
+                user.usage.linksRedeemedToday = 0;
+                user.usage.lastRedeemDate     = today;
+            }
+
+            await user.save();
+
+            await interaction.editReply({
+                embeds: [embed(COLOR.ok, 'Redemption Successful',
+                    `Code accepted.\nCurrent credits: **${user.credits}** (${user.credits * 8} hours of auto-renew).`
+                )]
+            });
+        });
+    }
+
+    // ════════════════════════════════════════
+    //  /devices
+    // ════════════════════════════════════════
+    else if (cmd === 'devices') {
+        await safe(async () => {
+            await interaction.deferReply({ ephemeral: true });
+
+            if (!user.xcloud?.accessToken) {
+                return interaction.editReply({
+                    embeds: [embed(COLOR.err, 'Not Logged In', 'Please use /login to authenticate first.')]
+                });
+            }
+
+            let sessions;
+            try {
+                sessions = await xcloudGetSessions(user.xcloud.accessToken);
+            } catch (e) {
+                if (e.message === 'TOKEN_EXPIRED') {
+                    // Re-login
+                    const password = decrypt(user.xcloud.password);
+                    const tokens   = await xcloudLogin(user.xcloud.username, password);
+                    user.xcloud.accessToken  = tokens.accessToken;
+                    user.xcloud.refreshToken = tokens.refreshToken;
+                    user.xcloud.lastLoginAt  = new Date();
+                    await user.save();
+                    sessions = await xcloudGetSessions(user.xcloud.accessToken);
+                } else throw e;
+            }
+
+            if (!sessions.length) {
+                return interaction.editReply({
+                    embeds: [embed(COLOR.info, 'No Active Devices', 'No active rental sessions were found on your account.')]
+                });
+            }
+
+            function fmtTime(ms) {
+                if (ms <= 0) return 'Expired';
+                const h = Math.floor(ms / 3600000);
+                const m = Math.floor((ms % 3600000) / 60000);
+                return h > 0 ? `${h}h ${m}m` : `${m}m`;
+            }
+
+            const options = sessions.map(s => ({
+                label:       s.deviceName.slice(0, 100),
+                description: `Time remaining: ${fmtTime(s.remainingMs)}`,
+                value:       `${s.sessionId}||${s.deviceName}`.slice(0, 100),
+            }));
+
+            const row = new ActionRowBuilder().addComponents(
+                new StringSelectMenuBuilder()
+                    .setCustomId('select_device')
+                    .setPlaceholder('Select a device to enable auto-renew')
+                    .addOptions(options)
+            );
+
+            await interaction.editReply({
+                embeds: [embed(COLOR.info, `Active Devices (${sessions.length})`,
+                    'Select a device from the menu below to activate auto-renew for it.'
+                )],
+                components: [row],
+            });
+        });
+    }
+
+    // ════════════════════════════════════════
+    //  /profile
+    // ════════════════════════════════════════
+    else if (cmd === 'profile') {
+        await safe(async () => {
+            await interaction.deferReply({ ephemeral: true });
+
+            const today = new Date().toISOString().slice(0, 10);
+            if (user.usage.lastRedeemDate !== today) {
+                user.usage.linksRedeemedToday = 0;
+            }
+
+            // Token status
+            let tokenStatus = 'Not logged in';
+            if (user.xcloud?.accessToken) {
+                try {
+                    const payload  = JSON.parse(
+                        Buffer.from(user.xcloud.accessToken.split('.')[1], 'base64').toString()
+                    );
+                    const msLeft = payload.exp * 1000 - Date.now();
+                    tokenStatus  = msLeft > 0
+                        ? `Valid (expires in ${Math.floor(msLeft / 60000)}m)`
+                        : 'Expired';
+                } catch { tokenStatus = 'Unknown'; }
+            }
+
+            const device  = user.autoDevice?.isEnabled
+                ? user.autoDevice.deviceName || 'Unknown'
+                : 'None';
+
+            await interaction.editReply({
+                embeds: [embed(COLOR.info, 'Profile', null, [
+                    { name: 'Credits',           value: `${user.credits} (${user.credits * 8} hours)`, inline: true },
+                    { name: 'Links Today',        value: `${user.usage.linksRedeemedToday}/3`,          inline: true },
+                    { name: 'Active Device',      value: device,                                        inline: true },
+                    { name: 'Token Status',       value: tokenStatus,                                   inline: true },
+                    { name: 'Next Deduction',     value: user.nextDeduction
+                        ? `<t:${Math.floor(user.nextDeduction.getTime() / 1000)}:R>`
+                        : 'N/A',                                                                         inline: true },
+                    { name: 'Auto-Renew',         value: user.autoDevice?.isEnabled ? 'Enabled' : 'Disabled', inline: true },
+                ])]
+            });
+        });
+    }
+
+    // ════════════════════════════════════════
+    //  /add [user] [amount]  (ADMIN)
+    // ════════════════════════════════════════
+    else if (cmd === 'add') {
+        await safe(async () => {
+            if (interaction.user.id !== OWNER_ID) {
+                return interaction.reply({
+                    embeds: [embed(COLOR.err, 'Access Denied', 'This command is restricted to the bot owner.')],
+                    ephemeral: true,
+                });
+            }
+            await interaction.deferReply({ ephemeral: true });
+
+            const target = interaction.options.getUser('user');
+            const amount = interaction.options.getInteger('amount');
+
+            const targetUser = await User.findOneAndUpdate(
+                { discordId: target.id },
+                { $setOnInsert: { discordId: target.id }, $inc: { credits: amount } },
+                { upsert: true, new: true }
+            );
+
+            // Set nextDeduction if credits were zero
+            if (!targetUser.nextDeduction) {
+                targetUser.nextDeduction = new Date(Date.now() + 8 * 3600 * 1000);
+                await targetUser.save();
             }
 
             await interaction.editReply({
-                embeds: [embedInfo('Trạng thái tài khoản',
-                    `Tài khoản: \`${user.xcloudUsername || 'Chưa rõ'}\`\n` +
-                    `Access Token: ${fmtToken(atMs)}\n` +
-                    `Refresh Token: ${fmtToken(rtMs)}\n` +
-                    `Auto Renew: ${user.autoRenew.enabled ? '🟢 BẬT' : '🔴 TẮT'}`
+                embeds: [embed(COLOR.ok, 'Credits Added',
+                    `Added **${amount}** credit(s) to <@${target.id}>.\nNew total: **${targetUser.credits}** credits.`
+                )]
+            });
+        });
+    }
+
+    // ════════════════════════════════════════
+    //  /reset [user]  (ADMIN)
+    // ════════════════════════════════════════
+    else if (cmd === 'reset') {
+        await safe(async () => {
+            if (interaction.user.id !== OWNER_ID) {
+                return interaction.reply({
+                    embeds: [embed(COLOR.err, 'Access Denied', 'This command is restricted to the bot owner.')],
+                    ephemeral: true,
+                });
+            }
+            await interaction.deferReply({ ephemeral: true });
+
+            const target = interaction.options.getUser('user');
+            await User.findOneAndUpdate(
+                { discordId: target.id },
+                { $set: { credits: 0, 'autoDevice.isEnabled': false, nextDeduction: null } }
+            );
+
+            await interaction.editReply({
+                embeds: [embed(COLOR.ok, 'User Reset',
+                    `Credits for <@${target.id}> have been reset to 0 and auto-renew has been disabled.`
                 )]
             });
         });
     }
 });
 
-// ================= REGISTER COMMANDS =================
+// ─────────────────────────────────────────
+//  REGISTER SLASH COMMANDS
+// ─────────────────────────────────────────
 async function registerCommands() {
-    const { REST, Routes } = require('discord.js');
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
     const commands = [
         {
-            name: 'config',
-            description: 'Đăng nhập tài khoản XCloud',
+            name:        'login',
+            description: 'Authenticate your XCloud account.',
             options: [
-                { name: 'username', description: 'Tên đăng nhập', type: 3, required: true },
-                { name: 'password', description: 'Mật khẩu', type: 3, required: true },
-            ]
+                { name: 'username', description: 'XCloud username', type: 3, required: true },
+                { name: 'password', description: 'XCloud password', type: 3, required: true },
+            ],
         },
         {
-            name: 'devices',
-            description: 'Xem danh sách thiết bị đang thuê',
+            name:        'get',
+            description: 'Obtain resources.',
+            options: [{
+                name:        'credit',
+                description: 'Generate a link to earn 1 credit.',
+                type:        1, // SUB_COMMAND
+            }],
         },
         {
-            name: 'renew',
-            description: 'Gia hạn tất cả thiết bị ngay',
+            name:        'redeem',
+            description: 'Redeem a credit code.',
             options: [
-                { name: 'hours', description: 'Số giờ gia hạn (mặc định 1)', type: 4, required: false }
-            ]
+                { name: 'code', description: 'The code to redeem (e.g. XC-A1B2C3)', type: 3, required: true },
+            ],
         },
         {
-            name: 'auto',
-            description: 'Quản lý tự động gia hạn',
+            name:        'devices',
+            description: 'View your active rental devices and select one for auto-renew.',
+        },
+        {
+            name:        'profile',
+            description: 'View your account profile, credits, and auto-renew status.',
+        },
+        {
+            name:        'add',
+            description: '[ADMIN] Add credits to a user.',
             options: [
-                {
-                    name: 'on',
-                    description: 'Bật auto renew',
-                    type: 1, // SUB_COMMAND
-                    options: [
-                        { name: 'threshold', description: 'Gia hạn khi còn dưới X giờ (mặc định 4)', type: 10, required: false },
-                        { name: 'hours', description: 'Số giờ gia hạn mỗi lần (mặc định 1)', type: 4, required: false },
-                    ]
-                },
-                {
-                    name: 'off',
-                    description: 'Tắt auto renew',
-                    type: 1,
-                },
-                {
-                    name: 'status',
-                    description: 'Xem trạng thái auto renew',
-                    type: 1,
-                },
-            ]
+                { name: 'user',   description: 'Target user',      type: 6, required: true },
+                { name: 'amount', description: 'Credits to add',   type: 4, required: true },
+            ],
         },
         {
-            name: 'status',
-            description: 'Xem trạng thái token và tài khoản',
+            name:        'reset',
+            description: '[ADMIN] Reset a user credits to 0.',
+            options: [
+                { name: 'user', description: 'Target user', type: 6, required: true },
+            ],
         },
     ];
 
@@ -650,26 +776,28 @@ async function registerCommands() {
             Routes.applicationCommands(process.env.CLIENT_ID),
             { body: commands }
         );
-        console.log('[CMD] Registered OK');
+        console.log('[CMD] All commands registered.');
     } catch (err) {
-        console.error('[CMD] Register failed:', err);
+        console.error('[CMD] Registration failed:', err);
     }
 }
 
-// ================= START =================
+// ─────────────────────────────────────────
+//  STARTUP
+// ─────────────────────────────────────────
 client.once('ready', async () => {
-    console.log(`[Bot] Logged in as ${client.user.tag}`);
+    console.log(`[Bot] Online as ${client.user.tag}`);
     await registerCommands();
-    setInterval(autoRenewWorker, WORKER_INTERVAL_MS);
-    console.log(`[Worker] Started, interval: ${WORKER_INTERVAL_MS / 1000}s`);
+    setInterval(autoRenewWorker, 10 * 60 * 1000); // Every 10 minutes
+    console.log('[Worker] Auto-renew worker started (interval: 10 min).');
 });
 
 mongoose.connect(process.env.MONGO_URI)
     .then(() => {
-        console.log('[DB] MongoDB connected');
+        console.log('[DB] MongoDB connected.');
         client.login(process.env.DISCORD_TOKEN);
     })
     .catch(err => {
-        console.error('[DB] Connect failed:', err);
+        console.error('[DB] Connection failed:', err);
         process.exit(1);
     });
