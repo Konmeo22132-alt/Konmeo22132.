@@ -8,8 +8,9 @@ require('dotenv').config();
 const {
     Client, GatewayIntentBits, Partials,
     EmbedBuilder, ActionRowBuilder,
-    StringSelectMenuBuilder, ComponentType,
-    REST, Routes
+    StringSelectMenuBuilder, ModalBuilder,
+    TextInputBuilder, TextInputStyle,
+    ComponentType, REST, Routes
 } = require('discord.js');
 const mongoose = require('mongoose');
 const axios   = require('axios');
@@ -69,8 +70,14 @@ const userSchema = new mongoose.Schema({
     nextDeduction: Date,
 
     usage: {
-        linksRedeemedToday: { type: Number,  default: 0 },
-        lastRedeemDate:     { type: String,  default: '' }, // YYYY-MM-DD
+        linksGeneratedToday: { type: Number, default: 0 },
+        lastGenerateDate:    { type: String, default: '' }, // YYYY-MM-DD
+        // The last un-redeemed pending link (code + shortened URL)
+        pendingLink: {
+            code:       String,
+            shortUrl:   String,
+            createdAt:  Date,
+        },
     },
 
     autoDevice: {
@@ -178,6 +185,28 @@ async function xcloudGetSessions(accessToken) {
         });
 }
 
+/**
+ * Safe decrypt — returns null instead of throwing if hash is missing/malformed.
+ */
+function safeDecrypt(hash) {
+    if (!hash || !hash.includes(':')) return null;
+    try { return decrypt(hash); } catch { return null; }
+}
+
+/**
+ * Re-login using stored credentials. Throws 'NO_STORED_PASSWORD' if password not saved.
+ */
+async function reloginUser(user) {
+    const password = safeDecrypt(user.xcloud?.password);
+    if (!password) throw new Error('NO_STORED_PASSWORD');
+    const tokens = await xcloudLogin(user.xcloud.username, password);
+    user.xcloud.accessToken  = tokens.accessToken;
+    user.xcloud.refreshToken = tokens.refreshToken;
+    user.xcloud.lastLoginAt  = new Date();
+    await user.save();
+    return tokens.accessToken;
+}
+
 /** Extend a rental session by `hours` hours. */
 async function xcloudExtend(accessToken, sessionId, hours = 1) {
     const res = await axios.post(
@@ -249,21 +278,17 @@ async function autoRenewWorker() {
             const FIVE_DAYS = 5 * 24 * 60 * 60 * 1000;
             if (user.xcloud?.lastLoginAt && Date.now() - user.xcloud.lastLoginAt.getTime() >= FIVE_DAYS) {
                 try {
-                    const password = decrypt(user.xcloud.password);
-                    const { accessToken, refreshToken } = await xcloudLogin(user.xcloud.username, password);
-                    user.xcloud.accessToken  = accessToken;
-                    user.xcloud.refreshToken = refreshToken;
-                    user.xcloud.lastLoginAt  = new Date();
+                    await reloginUser(user);
                     console.log(`[Worker] Re-login OK: ${user.discordId}`);
                 } catch (loginErr) {
-                    if (loginErr.message === 'INVALID_CREDENTIALS') {
+                    if (loginErr.message === 'INVALID_CREDENTIALS' || loginErr.message === 'NO_STORED_PASSWORD') {
                         user.autoDevice.isEnabled = false;
                         await user.save();
                         try {
                             const u = await client.users.fetch(user.discordId);
                             await u.send({
                                 embeds: [embed(COLOR.err, 'Auto-Renew Stopped',
-                                    'Your XCloud credentials are no longer valid. Please use /login to update them.'
+                                    'Your XCloud credentials are no longer valid. Please use `/login` to re-authenticate.'
                                 )]
                             });
                         } catch {}
@@ -286,7 +311,7 @@ async function autoRenewWorker() {
                         const u = await client.users.fetch(user.discordId);
                         await u.send({
                             embeds: [embed(COLOR.warn, 'Auto-Renew Stopped',
-                                'Your credits have been exhausted. Use /get credit to obtain more.'
+                                'Your credits have been exhausted. Use `/get credit` to obtain more.'
                             )]
                         });
                     } catch {}
@@ -295,41 +320,50 @@ async function autoRenewWorker() {
             }
 
             // ── 3. Auto-renew: ALWAYS re-fetch sessions from API ──────────
-            // Never trust the cached sessionId alone — device may have been deleted.
             let sessions;
             try {
                 sessions = await xcloudGetSessions(user.xcloud.accessToken);
             } catch (e) {
                 if (e.message === 'TOKEN_EXPIRED') {
-                    // Try re-login
-                    const password = decrypt(user.xcloud.password);
-                    const tokens = await xcloudLogin(user.xcloud.username, password);
-                    user.xcloud.accessToken  = tokens.accessToken;
-                    user.xcloud.refreshToken = tokens.refreshToken;
-                    user.xcloud.lastLoginAt  = new Date();
+                    await reloginUser(user);
                     sessions = await xcloudGetSessions(user.xcloud.accessToken);
-                } else {
-                    throw e;
-                }
+                } else throw e;
             }
 
-            // Verify the saved device still exists in the live session list
+            // Verify saved device still exists in live session list
             const activeSession = sessions.find(s => s.sessionId === user.autoDevice.sessionId);
 
             if (!activeSession) {
-                // Device no longer exists — disable auto-renew silently
-                console.log(`[Worker] Device not found for ${user.discordId}, disabling.`);
+                // Device no longer exists — disable and DM the user
+                const lostName = user.autoDevice.deviceName || 'your device';
+                console.log(`[Worker] Device not found for ${user.discordId} ("${lostName}"), disabling.`);
                 user.autoDevice.isEnabled = false;
                 await user.save();
+                try {
+                    const u = await client.users.fetch(user.discordId);
+                    await u.send({
+                        embeds: [embed(COLOR.warn, 'Device Removed',
+                            `**${lostName}** could not be found on your account.\n\n` +
+                            `Note: Devices that have not been used for an extended period may be automatically removed by XCloud.\n\n` +
+                            `Auto-renew has been disabled. Use \`/devices\` to select a new device.`
+                        )]
+                    });
+                } catch {}
                 continue;
             }
 
             // Renew if remaining time <= 4 hours
-            const FOUR_HOURS = 4 * 3600 * 1000;
-            if (activeSession.remainingMs <= FOUR_HOURS) {
-                await xcloudExtend(user.xcloud.accessToken, activeSession.sessionId, 1);
-                console.log(`[Worker] Renewed "${activeSession.deviceName}" for ${user.discordId}`);
-                // No DM on success per spec
+            if (activeSession.remainingMs <= 4 * 3600 * 1000) {
+                try {
+                    await xcloudExtend(user.xcloud.accessToken, activeSession.sessionId, 1);
+                    console.log(`[Worker] Renewed "${activeSession.deviceName}" for ${user.discordId}`);
+                } catch (extErr) {
+                    if (extErr.message === 'TOKEN_EXPIRED') {
+                        await reloginUser(user);
+                        await xcloudExtend(user.xcloud.accessToken, activeSession.sessionId, 1);
+                        console.log(`[Worker] Renewed "${activeSession.deviceName}" (after re-login) for ${user.discordId}`);
+                    } else throw extErr;
+                }
             }
 
             await user.save();
@@ -348,26 +382,63 @@ async function autoRenewWorker() {
 //  INTERACTION HANDLER
 // ─────────────────────────────────────────
 client.on('interactionCreate', async interaction => {
-    if (!interaction.isChatInputCommand() && !interaction.isStringSelectMenu()) return;
+    // ── Modal Submit: /login ─────────────────────────────────────────────
+    if (interaction.isModalSubmit() && interaction.customId === 'modal_login') {
+        let user = await User.findOneAndUpdate(
+            { discordId: interaction.user.id },
+            { $setOnInsert: { discordId: interaction.user.id } },
+            { upsert: true, new: true }
+        );
+        try {
+            await interaction.deferReply({ ephemeral: false });
+            const username = interaction.fields.getTextInputValue('input_username');
+            const password = interaction.fields.getTextInputValue('input_password');
+            try {
+                const { accessToken, refreshToken } = await xcloudLogin(username, password);
+                user.xcloud = {
+                    username,
+                    password:    encrypt(password),
+                    accessToken,
+                    refreshToken,
+                    lastLoginAt: new Date(),
+                };
+                await user.save();
+                await interaction.editReply({
+                    embeds: [embed(COLOR.ok, 'Login Successful',
+                        `Credentials for **${username}** have been saved and verified.`
+                    )]
+                });
+            } catch (err) {
+                if (err.message === 'INVALID_CREDENTIALS') {
+                    return interaction.editReply({
+                        embeds: [embed(COLOR.err, 'Login Failed', 'Invalid username or password.')]
+                    });
+                }
+                throw err;
+            }
+        } catch (err) {
+            console.error('[Modal:login]', err);
+            await interaction.editReply({
+                embeds: [embed(COLOR.err, 'Internal Error', 'An error occurred. Please try again.')]
+            }).catch(() => {});
+        }
+        return;
+    }
 
-    // ── Select Menu: device selection ──────────────────────────────────────
+    // ── Select Menu: device selection ────────────────────────────────────
     if (interaction.isStringSelectMenu() && interaction.customId === 'select_device') {
         try {
             const user = await User.findOne({ discordId: interaction.user.id });
             if (!user) return interaction.update({ content: 'User not found.', components: [] });
-
             const [sessionId, deviceName] = interaction.values[0].split('||');
             user.autoDevice = { sessionId, deviceName, isEnabled: true };
-
-            // If user has credits but nextDeduction was never set, initialise it
             if (user.credits > 0 && !user.nextDeduction) {
                 user.nextDeduction = new Date(Date.now() + 8 * 3600 * 1000);
             }
-
             await user.save();
             await interaction.update({
                 embeds: [embed(COLOR.ok, 'Device Selected',
-                    `Auto-renew has been activated for **${deviceName}**.\nCredits remaining: **${user.credits}** (${user.credits * 8} hours).`
+                    `Auto-renew activated for **${deviceName}**.\nCredits remaining: **${user.credits}** (${user.credits * 8} hours).`
                 )],
                 components: [],
             });
@@ -380,7 +451,7 @@ client.on('interactionCreate', async interaction => {
 
     if (!interaction.isChatInputCommand()) return;
 
-    // Fetch or create user document
+    // Fetch or create user
     let user = await User.findOneAndUpdate(
         { discordId: interaction.user.id },
         { $setOnInsert: { discordId: interaction.user.id } },
@@ -389,7 +460,7 @@ client.on('interactionCreate', async interaction => {
 
     const cmd = interaction.commandName;
 
-    // ── Safe runner ──────────────────────────────────────────────────────
+    // Safe runner
     const safe = async (fn) => {
         try {
             await fn();
@@ -397,7 +468,6 @@ client.on('interactionCreate', async interaction => {
             console.error(`[CMD:${cmd}]`, err);
             const payload = {
                 embeds: [embed(COLOR.err, 'Internal Error', 'An error occurred. Please try again later.')],
-                ephemeral: true,
             };
             if (interaction.deferred || interaction.replied) {
                 await interaction.editReply(payload).catch(() => {});
@@ -412,41 +482,34 @@ client.on('interactionCreate', async interaction => {
     };
 
     // ════════════════════════════════════════
-    //  /login [username] [password]
+    //  /login  →  shows Modal (no args in command)
     // ════════════════════════════════════════
     if (cmd === 'login') {
-        await safe(async () => {
-            await interaction.deferReply({ ephemeral: true });
+        const modal = new ModalBuilder()
+            .setCustomId('modal_login')
+            .setTitle('XCloud Login');
 
-            const username = interaction.options.getString('username');
-            const password = interaction.options.getString('password');
+        const usernameInput = new TextInputBuilder()
+            .setCustomId('input_username')
+            .setLabel('Username')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('Your XCloud username')
+            .setRequired(true);
 
-            try {
-                const { accessToken, refreshToken } = await xcloudLogin(username, password);
+        const passwordInput = new TextInputBuilder()
+            .setCustomId('input_password')
+            .setLabel('Password')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('Your XCloud password')
+            .setRequired(true);
 
-                user.xcloud = {
-                    username,
-                    password:     encrypt(password),
-                    accessToken,
-                    refreshToken,
-                    lastLoginAt:  new Date(),
-                };
-                await user.save();
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(usernameInput),
+            new ActionRowBuilder().addComponents(passwordInput),
+        );
 
-                await interaction.editReply({
-                    embeds: [embed(COLOR.ok, 'Login Successful',
-                        `Credentials for **${username}** have been saved and verified.`
-                    )]
-                });
-            } catch (err) {
-                if (err.message === 'INVALID_CREDENTIALS') {
-                    return interaction.editReply({
-                        embeds: [embed(COLOR.err, 'Login Failed', 'Invalid username or password.')]
-                    });
-                }
-                throw err;
-            }
-        });
+        await interaction.showModal(modal);
+        return;
     }
 
     // ════════════════════════════════════════
@@ -454,44 +517,59 @@ client.on('interactionCreate', async interaction => {
     // ════════════════════════════════════════
     else if (cmd === 'get' && interaction.options.getSubcommand() === 'credit') {
         await safe(async () => {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: false });
 
-            // Reset daily counter if date changed
             const today = new Date().toISOString().slice(0, 10);
-            if (user.usage.lastRedeemDate !== today) {
-                user.usage.linksRedeemedToday = 0;
-                user.usage.lastRedeemDate     = today;
+
+            // Reset daily counter if new day
+            if (user.usage.lastGenerateDate !== today) {
+                user.usage.linksGeneratedToday = 0;
+                user.usage.lastGenerateDate    = today;
+                user.usage.pendingLink         = undefined;
             }
 
-            if (user.usage.linksRedeemedToday >= 3) {
+            // If there is an un-redeemed pending link, return it with a note
+            if (user.usage.pendingLink?.code) {
                 return interaction.editReply({
-                    embeds: [embed(COLOR.warn, 'Daily Limit Reached',
-                        'You have reached the maximum of 3 links per day. Please try again tomorrow.'
+                    embeds: [embed(COLOR.warn, 'Pending Link',
+                        `You still have an unredeemed code from a previous request.\n\n` +
+                        `**Link:** ${user.usage.pendingLink.shortUrl}\n` +
+                        `**Code:** \`${user.usage.pendingLink.code}\`\n\n` +
+                        `Please use **/redeem** with the code above before generating a new link.`
                     )]
                 });
             }
 
-            // Generate code
+            // Check daily limit (5 per day)
+            if (user.usage.linksGeneratedToday >= 5) {
+                return interaction.editReply({
+                    embeds: [embed(COLOR.warn, 'Daily Limit Reached',
+                        'You have reached the maximum of 5 links per day. Please try again tomorrow.'
+                    )]
+                });
+            }
+
+            // Generate new code
             const code    = 'XC-' + crypto.randomBytes(3).toString('hex').toUpperCase();
             const b64Code = Buffer.from(code).toString('base64');
             const pageUrl = `${LANDING_BASE}?keyname=${encodeURIComponent(b64Code)}`;
 
-            let finalUrl = pageUrl;
-            try {
-                finalUrl = await shortenLink4m(pageUrl);
-            } catch {
-                // If Link4m fails, fall back to direct URL
-            }
+            let shortUrl = pageUrl;
+            try { shortUrl = await shortenLink4m(pageUrl); } catch {}
 
-            // Save pending code (TTL will auto-expire in 1 hour)
+            // Save to pendingCodes (TTL) and pendingLink
             user.pendingCodes.push({ code, createdAt: new Date() });
-            user.usage.linksRedeemedToday++;
-            user.usage.lastRedeemDate = today;
+            user.usage.pendingLink         = { code, shortUrl, createdAt: new Date() };
+            user.usage.linksGeneratedToday = (user.usage.linksGeneratedToday || 0) + 1;
+            user.usage.lastGenerateDate    = today;
             await user.save();
 
             await interaction.editReply({
                 embeds: [embed(COLOR.info, 'Credit Link Generated',
-                    `Complete the task at the link below, then use **/redeem** with your code.\n\n**Link:** ${finalUrl}\n\nLinks used today: **${user.usage.linksRedeemedToday}/3**`
+                    `Complete the task at the link below, then use **/redeem** with your code.\n\n` +
+                    `**Link:** ${shortUrl}\n` +
+                    `**Code:** \`${code}\`\n\n` +
+                    `Links generated today: **${user.usage.linksGeneratedToday}/5**`
                 )]
             });
         });
@@ -502,11 +580,10 @@ client.on('interactionCreate', async interaction => {
     // ════════════════════════════════════════
     else if (cmd === 'redeem') {
         await safe(async () => {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: false });
 
-            const code     = interaction.options.getString('code').trim().toUpperCase();
-            const today    = new Date().toISOString().slice(0, 10);
-            const codeIdx  = user.pendingCodes.findIndex(p => p.code === code);
+            const code    = interaction.options.getString('code').trim().toUpperCase();
+            const codeIdx = user.pendingCodes.findIndex(p => p.code === code);
 
             if (codeIdx === -1) {
                 return interaction.editReply({
@@ -514,21 +591,20 @@ client.on('interactionCreate', async interaction => {
                 });
             }
 
-            // Remove code
+            // Remove from pendingCodes
             user.pendingCodes.splice(codeIdx, 1);
+
+            // Clear pendingLink if it matches
+            if (user.usage.pendingLink?.code === code) {
+                user.usage.pendingLink = undefined;
+            }
 
             // Add 1 credit
             user.credits++;
 
-            // Reset nextDeduction timer if this is the first credit
+            // Initialise nextDeduction if first credit
             if (!user.nextDeduction || user.credits === 1) {
                 user.nextDeduction = new Date(Date.now() + 8 * 3600 * 1000);
-            }
-
-            // Update usage
-            if (user.usage.lastRedeemDate !== today) {
-                user.usage.linksRedeemedToday = 0;
-                user.usage.lastRedeemDate     = today;
             }
 
             await user.save();
@@ -546,7 +622,7 @@ client.on('interactionCreate', async interaction => {
     // ════════════════════════════════════════
     else if (cmd === 'devices') {
         await safe(async () => {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: false });
 
             if (!user.xcloud?.accessToken) {
                 return interaction.editReply({
@@ -559,27 +635,28 @@ client.on('interactionCreate', async interaction => {
                 sessions = await xcloudGetSessions(user.xcloud.accessToken);
             } catch (e) {
                 if (e.message === 'TOKEN_EXPIRED') {
-                    // Re-login
-                    const password = decrypt(user.xcloud.password);
-                    const tokens   = await xcloudLogin(user.xcloud.username, password);
-                    user.xcloud.accessToken  = tokens.accessToken;
-                    user.xcloud.refreshToken = tokens.refreshToken;
-                    user.xcloud.lastLoginAt  = new Date();
-                    await user.save();
+                    try {
+                        await reloginUser(user);
+                    } catch (reErr) {
+                        return interaction.editReply({
+                            embeds: [embed(COLOR.err, 'Session Expired',
+                                'Your session has expired and the stored credentials could not refresh it automatically. Please use `/login` again.'
+                            )]
+                        });
+                    }
                     sessions = await xcloudGetSessions(user.xcloud.accessToken);
                 } else throw e;
             }
 
             if (!sessions.length) {
                 return interaction.editReply({
-                    embeds: [embed(COLOR.info, 'No Active Devices', 'No active rental sessions were found on your account.')]
+                    embeds: [embed(COLOR.info, 'No Active Devices', 'No active rental sessions found on your account.')]
                 });
             }
 
             function fmtTime(ms) {
                 if (ms <= 0) return 'Expired';
-                const h = Math.floor(ms / 3600000);
-                const m = Math.floor((ms % 3600000) / 60000);
+                const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
                 return h > 0 ? `${h}h ${m}m` : `${m}m`;
             }
 
@@ -598,7 +675,7 @@ client.on('interactionCreate', async interaction => {
 
             await interaction.editReply({
                 embeds: [embed(COLOR.info, `Active Devices (${sessions.length})`,
-                    'Select a device from the menu below to activate auto-renew for it.'
+                    'Select a device from the menu below to activate auto-renew.'
                 )],
                 components: [row],
             });
@@ -610,18 +687,15 @@ client.on('interactionCreate', async interaction => {
     // ════════════════════════════════════════
     else if (cmd === 'profile') {
         await safe(async () => {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: false });
 
             const today = new Date().toISOString().slice(0, 10);
-            if (user.usage.lastRedeemDate !== today) {
-                user.usage.linksRedeemedToday = 0;
-            }
+            if (user.usage.lastGenerateDate !== today) user.usage.linksGeneratedToday = 0;
 
-            // Token status
             let tokenStatus = 'Not logged in';
             if (user.xcloud?.accessToken) {
                 try {
-                    const payload  = JSON.parse(
+                    const payload = JSON.parse(
                         Buffer.from(user.xcloud.accessToken.split('.')[1], 'base64').toString()
                     );
                     const msLeft = payload.exp * 1000 - Date.now();
@@ -631,20 +705,19 @@ client.on('interactionCreate', async interaction => {
                 } catch { tokenStatus = 'Unknown'; }
             }
 
-            const device  = user.autoDevice?.isEnabled
+            const device = user.autoDevice?.isEnabled
                 ? user.autoDevice.deviceName || 'Unknown'
                 : 'None';
 
             await interaction.editReply({
                 embeds: [embed(COLOR.info, 'Profile', null, [
-                    { name: 'Credits',           value: `${user.credits} (${user.credits * 8} hours)`, inline: true },
-                    { name: 'Links Today',        value: `${user.usage.linksRedeemedToday}/3`,          inline: true },
-                    { name: 'Active Device',      value: device,                                        inline: true },
-                    { name: 'Token Status',       value: tokenStatus,                                   inline: true },
-                    { name: 'Next Deduction',     value: user.nextDeduction
-                        ? `<t:${Math.floor(user.nextDeduction.getTime() / 1000)}:R>`
-                        : 'N/A',                                                                         inline: true },
-                    { name: 'Auto-Renew',         value: user.autoDevice?.isEnabled ? 'Enabled' : 'Disabled', inline: true },
+                    { name: 'Credits',       value: `${user.credits} (${user.credits * 8} hours)`,       inline: true },
+                    { name: 'Links Today',   value: `${user.usage.linksGeneratedToday || 0}/5`,           inline: true },
+                    { name: 'Active Device', value: device,                                               inline: true },
+                    { name: 'Token Status',  value: tokenStatus,                                          inline: true },
+                    { name: 'Next Deduction', value: user.nextDeduction
+                        ? `<t:${Math.floor(user.nextDeduction.getTime() / 1000)}:R>` : 'N/A',            inline: true },
+                    { name: 'Auto-Renew',    value: user.autoDevice?.isEnabled ? 'Enabled' : 'Disabled', inline: true },
                 ])]
             });
         });
@@ -661,22 +734,28 @@ client.on('interactionCreate', async interaction => {
                     ephemeral: true,
                 });
             }
-            await interaction.deferReply({ ephemeral: true });
-
+            await interaction.deferReply({ ephemeral: false });
             const target = interaction.options.getUser('user');
             const amount = interaction.options.getInteger('amount');
-
             const targetUser = await User.findOneAndUpdate(
                 { discordId: target.id },
                 { $setOnInsert: { discordId: target.id }, $inc: { credits: amount } },
                 { upsert: true, new: true }
             );
-
-            // Set nextDeduction if credits were zero
             if (!targetUser.nextDeduction) {
                 targetUser.nextDeduction = new Date(Date.now() + 8 * 3600 * 1000);
                 await targetUser.save();
             }
+
+            // DM the target user
+            try {
+                const targetDiscord = await client.users.fetch(target.id);
+                await targetDiscord.send({
+                    embeds: [embed(COLOR.ok, 'Credits Received',
+                        `You have received **${amount}** credit(s).\nNew total: **${targetUser.credits}** credits (${targetUser.credits * 8} hours of auto-renew).`
+                    )]
+                });
+            } catch {}
 
             await interaction.editReply({
                 embeds: [embed(COLOR.ok, 'Credits Added',
@@ -697,13 +776,22 @@ client.on('interactionCreate', async interaction => {
                     ephemeral: true,
                 });
             }
-            await interaction.deferReply({ ephemeral: true });
-
+            await interaction.deferReply({ ephemeral: false });
             const target = interaction.options.getUser('user');
             await User.findOneAndUpdate(
                 { discordId: target.id },
                 { $set: { credits: 0, 'autoDevice.isEnabled': false, nextDeduction: null } }
             );
+
+            // DM the target user
+            try {
+                const targetDiscord = await client.users.fetch(target.id);
+                await targetDiscord.send({
+                    embeds: [embed(COLOR.warn, 'Credits Reset',
+                        'Your credits have been reset to 0 and auto-renew has been disabled by an administrator.'
+                    )]
+                });
+            } catch {}
 
             await interaction.editReply({
                 embeds: [embed(COLOR.ok, 'User Reset',
@@ -724,18 +812,14 @@ async function registerCommands() {
         {
             name:        'login',
             description: 'Authenticate your XCloud account.',
-            options: [
-                { name: 'username', description: 'XCloud username', type: 3, required: true },
-                { name: 'password', description: 'XCloud password', type: 3, required: true },
-            ],
         },
         {
             name:        'get',
             description: 'Obtain resources.',
             options: [{
                 name:        'credit',
-                description: 'Generate a link to earn 1 credit.',
-                type:        1, // SUB_COMMAND
+                description: 'Generate a link to earn 1 credit (max 5 per day).',
+                type:        1,
             }],
         },
         {
