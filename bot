@@ -533,9 +533,8 @@ client.on('interactionCreate', async interaction => {
                 return interaction.editReply({
                     embeds: [embed(COLOR.warn, 'Pending Link',
                         `You still have an unredeemed code from a previous request.\n\n` +
-                        `**Link:** ${user.usage.pendingLink.shortUrl}\n` +
-                        `**Code:** \`${user.usage.pendingLink.code}\`\n\n` +
-                        `Please use **/redeem** with the code above before generating a new link.`
+                        `**Link:** ${user.usage.pendingLink.shortUrl}\n\n` +
+                        `Please use **/redeem** with your code before generating a new link.\nThe code was sent to your DMs when the link was first generated.`
                     )]
                 });
             }
@@ -566,9 +565,8 @@ client.on('interactionCreate', async interaction => {
 
             await interaction.editReply({
                 embeds: [embed(COLOR.info, 'Credit Link Generated',
-                    `Complete the task at the link below, then use **/redeem** with your code.\n\n` +
-                    `**Link:** ${shortUrl}\n` +
-                    `**Code:** \`${code}\`\n\n` +
+                    `Complete the task at the link below to receive your redeem code.\n\n` +
+                    `**Link:** ${shortUrl}\n\n` +
                     `Links generated today: **${user.usage.linksGeneratedToday}/5**`
                 )]
             });
