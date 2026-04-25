@@ -125,7 +125,7 @@ function cookieString(at, rt) {
 
 /**
  * Login to XCloud. Returns { accessToken, refreshToken }.
- * Tokens come from Set-Cookie header.
+ * Tokens may come from Set-Cookie header OR response body.
  */
 async function xcloudLogin(username, password) {
     const res = await axios.post(
@@ -136,8 +136,29 @@ async function xcloudLogin(username, password) {
 
     if (res.status === 400 || res.status === 401) throw new Error('INVALID_CREDENTIALS');
 
-    const { accessToken, refreshToken } = extractCookies(res.headers['set-cookie']);
-    if (!accessToken || !refreshToken)  throw new Error('TOKEN_NOT_FOUND');
+    // Try Set-Cookie header first
+    let { accessToken, refreshToken } = extractCookies(res.headers['set-cookie']);
+
+    // Fallback: try response body (some API versions return tokens in body)
+    if (!accessToken) {
+        accessToken = res.data?.accessToken
+            || res.data?.renterAccessToken
+            || res.data?.data?.accessToken
+            || res.data?.token;
+    }
+    if (!refreshToken) {
+        refreshToken = res.data?.refreshToken
+            || res.data?.renterRefreshToken
+            || res.data?.data?.refreshToken;
+    }
+
+    if (!accessToken || !refreshToken) {
+        // Log full response for debugging
+        console.error('[xcloudLogin] TOKEN_NOT_FOUND — status:', res.status);
+        console.error('[xcloudLogin] Response body:', JSON.stringify(res.data)?.slice(0, 500));
+        console.error('[xcloudLogin] Set-Cookie:', res.headers['set-cookie']);
+        throw new Error('TOKEN_NOT_FOUND');
+    }
 
     return { accessToken, refreshToken };
 }
@@ -310,31 +331,76 @@ async function autoRenewWorker() {
 
     for (const user of users) {
         try {
-            // ── 1. Auto re-login every 5 days ──────────────────────────────
-            const FIVE_DAYS = 5 * 24 * 60 * 60 * 1000;
-            if (user.xcloud?.lastLoginAt && Date.now() - user.xcloud.lastLoginAt.getTime() >= FIVE_DAYS) {
+
+            // ── STEP 1: Proactive re-login every 55 minutes ───────────────
+            // Re-login frequently to ensure token is always fresh.
+            const FIFTY_FIVE_MIN = 55 * 60 * 1000;
+            const lastLogin = user.xcloud?.lastLoginAt;
+            const needsRelogin = !lastLogin || (Date.now() - lastLogin.getTime() >= FIFTY_FIVE_MIN);
+
+            if (needsRelogin) {
+                const password = safeDecrypt(user.xcloud?.password);
+                if (!password) {
+                    // No stored password — can't auto-login, must ask user
+                    user.autoDevice.isEnabled = false;
+                    await user.save();
+                    try {
+                        const u = await client.users.fetch(user.discordId);
+                        await u.send({
+                            embeds: [embed(COLOR.err, 'Auto-Renew Stopped',
+                                'Your session has expired and no stored credentials were found.\n' +
+                                'Please use `/login` to re-authenticate.'
+                            )]
+                        });
+                    } catch {}
+                    continue;
+                }
+
                 try {
-                    await reloginUser(user);
-                    console.log(`[Worker] Re-login OK: ${user.discordId}`);
+                    const tokens = await xcloudLogin(user.xcloud.username, password);
+                    user.xcloud.accessToken  = tokens.accessToken;
+                    user.xcloud.refreshToken = tokens.refreshToken;
+                    user.xcloud.lastLoginAt  = new Date();
+                    await user.save();
+                    console.log(`[Worker] Proactive re-login OK: ${user.discordId}`);
                 } catch (loginErr) {
-                    if (loginErr.message === 'INVALID_CREDENTIALS' || loginErr.message === 'NO_STORED_PASSWORD') {
+                    console.error(`[Worker] Re-login failed for ${user.discordId}:`, loginErr.message);
+
+                    // Retry once after 5 seconds
+                    await new Promise(r => setTimeout(r, 5000));
+                    try {
+                        const tokens = await xcloudLogin(user.xcloud.username, password);
+                        user.xcloud.accessToken  = tokens.accessToken;
+                        user.xcloud.refreshToken = tokens.refreshToken;
+                        user.xcloud.lastLoginAt  = new Date();
+                        await user.save();
+                        console.log(`[Worker] Re-login OK (retry): ${user.discordId}`);
+                    } catch (retryErr) {
+                        // Both attempts failed — disable and notify
                         user.autoDevice.isEnabled = false;
                         await user.save();
                         try {
                             const u = await client.users.fetch(user.discordId);
                             await u.send({
                                 embeds: [embed(COLOR.err, 'Auto-Renew Stopped',
-                                    'Your XCloud credentials are no longer valid. Please use `/login` to re-authenticate.'
+                                    `Your XCloud session could not be refreshed (${retryErr.message}).\n` +
+                                    'Please use `/login` to re-authenticate.'
                                 )]
                             });
                         } catch {}
+                        try {
+                            const owner = await client.users.fetch(OWNER_ID);
+                            await owner.send(
+                                `⚠️ **Re-login failed** for <@${user.discordId}>\n` +
+                                `Reason: \`${retryErr.message}\`\nAuto-renew disabled.`
+                            );
+                        } catch {}
                         continue;
                     }
-                    throw loginErr;
                 }
             }
 
-            // ── 2. Credit deduction ────────────────────────────────────────
+            // ── STEP 2: Credit deduction every 8h ────────────────────────
             if (!user.nextDeduction || Date.now() >= user.nextDeduction.getTime()) {
                 user.credits -= 1;
                 user.nextDeduction = new Date(Date.now() + 8 * 3600 * 1000);
@@ -355,22 +421,32 @@ async function autoRenewWorker() {
                 }
             }
 
-            // ── 3. Auto-renew: ALWAYS re-fetch sessions from API ──────────
+            // ── STEP 3: Fetch sessions + renew if needed ──────────────────
             let sessions;
             try {
                 sessions = await xcloudGetSessions(user.xcloud.accessToken);
             } catch (e) {
-                if (e.message === 'TOKEN_EXPIRED') {
-                    await reloginUser(user);
-                    sessions = await xcloudGetSessions(user.xcloud.accessToken);
-                } else throw e;
+                if (e.message === 'TOKEN_EXPIRED' || e.message.startsWith('GET_SESSIONS_4')) {
+                    // Token rejected by server — force immediate re-login
+                    console.log(`[Worker] Token rejected (${e.message}), forcing re-login for ${user.discordId}`);
+                    try {
+                        await reloginUser(user);
+                        sessions = await xcloudGetSessions(user.xcloud.accessToken);
+                    } catch (reErr) {
+                        console.error(`[Worker] Force re-login failed for ${user.discordId}:`, reErr.message);
+                        // Will retry next cycle
+                        await user.save();
+                        continue;
+                    }
+                } else {
+                    throw e;
+                }
             }
 
-            // Verify saved device still exists in live session list
+            // ── STEP 4: Verify device still exists ───────────────────────
             const activeSession = sessions.find(s => s.sessionId === user.autoDevice.sessionId);
 
             if (!activeSession) {
-                // Device no longer exists — disable and DM the user
                 const lostName = user.autoDevice.deviceName || 'your device';
                 console.log(`[Worker] Device not found for ${user.discordId} ("${lostName}"), disabling.`);
                 user.autoDevice.isEnabled = false;
@@ -388,27 +464,37 @@ async function autoRenewWorker() {
                 continue;
             }
 
-            // Renew if remaining time <= 4 hours
+            // ── STEP 5: Renew if remaining time <= 4 hours ───────────────
             if (activeSession.remainingMs <= 4 * 3600 * 1000) {
                 try {
                     await xcloudExtend(user.xcloud.accessToken, activeSession.sessionId, 1);
                     console.log(`[Worker] Renewed "${activeSession.deviceName}" for ${user.discordId}`);
                 } catch (extErr) {
-                    if (extErr.message === 'TOKEN_EXPIRED') {
-                        await reloginUser(user);
-                        await xcloudExtend(user.xcloud.accessToken, activeSession.sessionId, 1);
-                        console.log(`[Worker] Renewed "${activeSession.deviceName}" (after re-login) for ${user.discordId}`);
-                    } else throw extErr;
+                    if (extErr.message === 'TOKEN_EXPIRED' || extErr.message.startsWith('EXTEND_4')) {
+                        // Token rejected during extend — re-login and retry once
+                        try {
+                            await reloginUser(user);
+                            await xcloudExtend(user.xcloud.accessToken, activeSession.sessionId, 1);
+                            console.log(`[Worker] Renewed "${activeSession.deviceName}" (after re-login) for ${user.discordId}`);
+                        } catch (e2) {
+                            console.error(`[Worker] Extend retry failed for ${user.discordId}:`, e2.message);
+                        }
+                    } else {
+                        throw extErr;
+                    }
                 }
             }
 
             await user.save();
 
         } catch (err) {
-            console.error(`[Worker] Error for ${user.discordId}:`, err.message);
+            console.error(`[Worker] Unhandled error for ${user.discordId}:`, err.message);
             try {
                 const owner = await client.users.fetch(OWNER_ID);
-                await owner.send(`**Worker Error** (${user.discordId})\n\`\`\`\n${err.stack?.slice(0, 1800)}\n\`\`\``);
+                await owner.send(
+                    `⚠️ **Worker Error** (<@${user.discordId}>)\n` +
+                    `\`\`\`\n${err.stack?.slice(0, 1500)}\n\`\`\``
+                );
             } catch {}
         }
     }
@@ -885,6 +971,53 @@ client.on('interactionCreate', async interaction => {
             });
         });
     }
+
+    // ════════════════════════════════════════
+    //  /notify [message]  (ADMIN)
+    // ════════════════════════════════════════
+    else if (cmd === 'notify') {
+        await safe(async () => {
+            if (interaction.user.id !== OWNER_ID) {
+                return interaction.reply({
+                    embeds: [embed(COLOR.err, 'Access Denied', 'This command is restricted to the bot owner.')],
+                    ephemeral: true,
+                });
+            }
+
+            await interaction.deferReply({ ephemeral: false });
+
+            const message = interaction.options.getString('message');
+
+            // Fetch all users that have ever interacted with the bot
+            const allUsers = await User.find({});
+
+            let sent = 0, failed = 0;
+
+            for (const u of allUsers) {
+                try {
+                    const discordUser = await client.users.fetch(u.discordId);
+                    await discordUser.send({
+                        embeds: [new EmbedBuilder()
+                            .setColor(COLOR.info)
+                            .setTitle('📢 Announcement')
+                            .setDescription(message)
+                            .setFooter({ text: 'XCloud Bot' })
+                            .setTimestamp()
+                        ]
+                    });
+                    sent++;
+                } catch {
+                    failed++;
+                }
+            }
+
+            await interaction.editReply({
+                embeds: [embed(COLOR.ok, 'Notification Sent',
+                    `Sent to **${sent}** user(s).\nFailed: **${failed}** (DMs closed or bot blocked).`
+                )]
+            });
+        });
+    }
 });
 
 // ─────────────────────────────────────────
@@ -931,6 +1064,13 @@ async function registerCommands() {
             ],
         },
         {
+            name:        'notify',
+            description: '[ADMIN] Send a broadcast message to all users.',
+            options: [
+                { name: 'message', description: 'Message to send to all users', type: 3, required: true },
+            ],
+        },
+        {
             name:        'reset',
             description: '[ADMIN] Reset a user credits to 0.',
             options: [
@@ -964,6 +1104,33 @@ client.once('ready', async () => {
 
     setInterval(autoRenewWorker, 10 * 60 * 1000); // Then every 10 minutes
     console.log('[Worker] Auto-renew worker started (interval: 10 min).');
+
+    // ── DM owner the raw login response for debugging ──
+    // Remove this after TOKEN_NOT_FOUND is resolved
+    if (process.env.DEBUG_LOGIN === 'true') {
+        try {
+            const testUser = await User.findOne({ 'xcloud.username': { $exists: true } });
+            if (testUser?.xcloud?.username && testUser?.xcloud?.password) {
+                const pass = safeDecrypt(testUser.xcloud.password);
+                if (pass) {
+                    const res = await axios.post(
+                        `${XCLOUD_API}/auth/renters/login`,
+                        { username: testUser.xcloud.username, password: pass, userDeviceId: crypto.randomUUID() },
+                        { headers: { ...XCLOUD_HEADERS, 'Content-Type': 'application/json' }, validateStatus: () => true }
+                    );
+                    const owner = await client.users.fetch(OWNER_ID);
+                    await owner.send(
+                        `**[DEBUG] Login raw response**\n` +
+                        `Status: \`${res.status}\`\n` +
+                        `Set-Cookie: \`${JSON.stringify(res.headers['set-cookie'])?.slice(0, 500)}\`\n` +
+                        `Body: \`\`\`json\n${JSON.stringify(res.data)?.slice(0, 800)}\n\`\`\``
+                    );
+                }
+            }
+        } catch (e) {
+            console.error('[DEBUG] Login probe failed:', e.message);
+        }
+    }
 });
 
 mongoose.connect(process.env.MONGO_URI)
