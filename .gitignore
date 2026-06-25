@@ -8,10 +8,8 @@
 # Unignore gitignore
 !.gitignore
 
-# Unignore Surge Hub code files
+# Unignore Surge Hub code files — CHỈ push kaitun.lua
 !kaitun.lua
-!kaitun.config.example.lua
-!KAITUN_MODULES.md
 
 # Ignore debug folder
 debug/
