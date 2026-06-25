@@ -824,13 +824,20 @@ local function tryBuySeedsTiered(maxBuys)
             backoff = 10
         elseif totalAvailableStock == 0 then
             BuyBackoff.reason = "no_stock"
-            -- Hết stock: backoff ngắn (3s) vì restock có thể xảy ra bất cứ lúc nào
-            backoff = 3
+            -- Hết stock: backoff 15s (restock thường vài chục giây) — tránh spam log
+            backoff = 15
         else
             BuyBackoff.reason = "unknown"
         end
         BuyBackoff.untilTs = os.clock() + backoff
-        log("Buy backoff " .. backoff .. "s — " .. BuyBackoff.reason)
+        -- Chỉ log khi reason thay đổi (tránh spam console mỗi 3s)
+        if BuyBackoff.lastLoggedReason ~= BuyBackoff.reason then
+            BuyBackoff.lastLoggedReason = BuyBackoff.reason
+            log("Buy backoff " .. backoff .. "s — " .. BuyBackoff.reason)
+        end
+    else
+        -- Đã mua được → reset log reason để lần hết stock tiếp theo sẽ log lại
+        BuyBackoff.lastLoggedReason = nil
     end
     return bought
 end
