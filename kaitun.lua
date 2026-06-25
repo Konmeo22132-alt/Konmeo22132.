@@ -1169,14 +1169,32 @@ local function snatchWorldSeedTarget(target)
         elseif target.name == "Rainbow" then
             State.rainbowSeedCollected = (State.rainbowSeedCollected or 0) + 1
         end
-        -- Webhook chi tiết: tên seed + tổng số đã collect
+        -- Webhook embed chi tiết: tách riêng Gold/Rainbow
         if Config.WebhookOnSeedCollect then
-            sendWebhook(("🌟 **%s** nhặt được **%s Seed** | Tổng: Gold ×%d, Rainbow ×%d")
-                :format(LocalPlayer.Name, target.name,
-                    State.goldSeedCollected or 0,
-                    State.rainbowSeedCollected or 0))
+            local color, emoji, label
+            if target.name == "Gold" then
+                color, emoji, label = 0xF1C40F, "🥇", "Gold Seed"
+            elseif target.name == "Rainbow" then
+                color, emoji, label = 0xE74C3C, "🌈", "Rainbow Seed"
+            else
+                color, emoji, label = 0x9B59B6, "✨", target.name .. " Seed"
+            end
+            sendWebhookEmbed(
+                emoji .. " Nhặt được " .. label,
+                string.format("**%s** vừa nhặt được **%s**", LocalPlayer.Name, label),
+                color,
+                {
+                    { name = "Seed", value = label, inline = true },
+                    { name = "Gold đã collect", value = "×" .. tostring(State.goldSeedCollected or 0), inline = true },
+                    { name = "Rainbow đã collect", value = "×" .. tostring(State.rainbowSeedCollected or 0), inline = true },
+                }
+            )
         else
-            sendWebhook("Snatched **" .. target.name .. "** seed — " .. LocalPlayer.Name)
+            sendWebhookEmbed(
+                "✨ Snatched " .. target.name .. " seed",
+                string.format("**%s** nhặt được **%s** seed", LocalPlayer.Name, target.name),
+                0x9B59B6
+            )
         end
     end
     return got
@@ -1962,19 +1980,27 @@ local function countGoldRainbowSeeds()
     return gold, rainbow
 end
 
--- Webhook status định kỳ: tài khoản, tiền, tổng seed, số pet, gold/rainbow, uptime
+-- Webhook status định kỳ: tài khoản, tiền, tổng seed, số pet, gold/rainbow, uptime (EMBED)
 local function sendStatusWebhook()
     local sheckles = getPlayerSheckles()
     local totalSeeds = countTotalSeeds()
     local petCount = countOwnedPets()
     local goldInv, rainbowInv = countGoldRainbowSeeds()
     local uptimeStr = formatUptime(os.difftime(os.time(), State.startTime or os.time()))
-    local msg = ("📊 **%s** | £%s | Seeds: %d | Pets: %d | Gold seed: %d (collected %d) | Rainbow seed: %d (collected %d) | Phase: `%s` | Uptime: `%s`")
-        :format(LocalPlayer.Name, tostring(sheckles), totalSeeds, petCount,
-            goldInv, State.goldSeedCollected or 0,
-            rainbowInv, State.rainbowSeedCollected or 0,
-            State.phase, uptimeStr)
-    sendWebhook(msg)
+    sendWebhookEmbed(
+        "📊 Status — " .. LocalPlayer.Name,
+        nil,
+        0x3498DB,
+        {
+            { name = "Sheckles", value = "£" .. tostring(sheckles), inline = true },
+            { name = "Seeds", value = tostring(totalSeeds), inline = true },
+            { name = "Pets", value = tostring(petCount), inline = true },
+            { name = "Gold seed", value = string.format("Túi: %d | Đã collect: %d", goldInv, State.goldSeedCollected or 0), inline = true },
+            { name = "Rainbow seed", value = string.format("Túi: %d | Đã collect: %d", rainbowInv, State.rainbowSeedCollected or 0), inline = true },
+            { name = "Phase", value = "`" .. tostring(State.phase) .. "`", inline = true },
+            { name = "Uptime", value = "`" .. uptimeStr .. "`", inline = true },
+        }
+    )
 end
 
 -- ── Performance / FPS / Hide 3D ─────────────────────────────────────────────
@@ -2243,7 +2269,15 @@ stopKaitun = function()
     State.phase = "stopped"
     log("Stopped")
     syncKaitunGenv()
-    sendWebhook("Surge Hub stopped — " .. LocalPlayer.Name)
+    sendWebhookEmbed(
+        "🛑 Surge Hub stopped",
+        string.format("Script đã dừng — **%s**", LocalPlayer.Name),
+        0xE74C3C,
+        {
+            { name = "Sheckles", value = "£" .. tostring(getPlayerSheckles()), inline = true },
+            { name = "Uptime", value = "`" .. formatUptime(os.difftime(os.time(), State.startTime or os.time())) .. "`", inline = true },
+        }
+    )
 end
 
 local function classifyTool(tool)
@@ -2712,7 +2746,16 @@ startAntiAfk()
 startWorldSeedSnatcher()
 -- Farm loops (buy/plant/harvest/sell/maintenance) sẽ start SAU khi tutorial done
 -- (xem main orchestrator). Nếu tutorial disable thì start ngay.
-sendWebhook("Surge Hub started — " .. LocalPlayer.Name .. " | £" .. tostring(getPlayerSheckles()))
+sendWebhookEmbed(
+    "🟢 Surge Hub started",
+    string.format("Script đã khởi động — **%s**", LocalPlayer.Name),
+    0x2ECC71,
+    {
+        { name = "Sheckles", value = "£" .. tostring(getPlayerSheckles()), inline = true },
+        { name = "Mode", value = "`" .. getMovementMode() .. "`", inline = true },
+        { name = "Pet finder", value = "`" .. table.concat(getPetFinderQueue(), ", ") .. "`", inline = true },
+    }
+)
 State.startTime = os.time()
 State.lastRejoinNotified = os.time()
 
