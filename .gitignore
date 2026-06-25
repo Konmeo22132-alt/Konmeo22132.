@@ -1,0 +1,21 @@
+# Repo temp — chỉ track file code Surge Hub, ignore mọi thứ còn lại
+# Giữ nguyên các file temp đã có trên remote (ảnh, mp3, mp4, js, html...)
+# Chỉ push/untrack các file Lua/MD liên quan
+
+# Ignore toàn bộ
+*
+
+# Unignore gitignore
+!.gitignore
+
+# Unignore Surge Hub code files
+!kaitun.lua
+!kaitun.config.example.lua
+!KAITUN_MODULES.md
+
+# Ignore debug folder
+debug/
+
+# Ignore runtime artifacts
+Surge Hub/
+*.log

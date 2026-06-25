@@ -3,9 +3,16 @@
 
   getgenv().KaitunConfig = { MovementMode = "legit" | "cheat", ... }
   loadstring(readfile("kaitun.lua"))()
+
+  Runtime API (after load):
+    getgenv().KaitunStop()   — stop all loops gracefully
+    getgenv().KaitunRunning  — boolean
+    getgenv().KaitunState    — { phase, status, ... }
+
+  Deep-dive docs: KAITUN_MODULES.md
 ]]
 
--- Giá seed GAG2 (rẻ → đắt)
+-- Giá seed GAG2 (rẻ → đắt) — tên khớp với SeedShop UI thật trong game
 local SEED_CATALOG = {
     { name = "Carrot", price = 1 },
     { name = "Strawberry", price = 10 },
@@ -25,10 +32,12 @@ local SEED_CATALOG = {
     { name = "Dragon Fruit", price = 120000 },
     { name = "Mango", price = 300000 },
     { name = "Acorn", price = 700000 },
-    { name = "Cherry Sunflower", price = 1200000 },
+    { name = "Cherry", price = 1200000 },
+    { name = "Sunflower", price = 1500000 },
     { name = "Venus Fly Trap", price = 7000000 },
     { name = "Pomegranate", price = 12000000 },
     { name = "Poison Apple", price = 25000000 },
+    { name = "Venom Spitter", price = 50000000 },
     { name = "Moon Bloom", price = 65000000 },
     { name = "Dragon's Breath", price = 90000000 },
 }
@@ -96,6 +105,12 @@ local DEFAULT_CONFIG = {
     Tutorial = {
         Enable = true,
         SendFirstPet = true,
+        -- Auto-tutorial flow: tạo file Surge Hub/Surge.json, mua 1 carrot → plant →
+        -- harvest (đợi inventory +1 carrot) → sell → mark tutorialDone=true trong file.
+        -- Flow chính (buy/plant/harvest/sell) bị BLOCK cho đến khi tutorial xong.
+        AutoFlow = true,
+        SeedName = "Carrot",
+        HarvestTimeout = 60,   -- giây, chờ harvest carrot
     },
 
     PetFinder = {
@@ -106,16 +121,25 @@ local DEFAULT_CONFIG = {
     },
 
     BuyGears = { "Common Sprinkler", "Common Watering Can" },
-    MaxBuysPerCycle = 20,
-    MaxBuysPerTick = 3,
-    PlantAttemptsPerTick = 8,
+    MaxBuysPerCycle = 50,
+    MaxBuysPerTick = 25,
+    PlantAttemptsPerTick = 32,
     MaxInventoryTools = 83,
-    HarvestCycleInterval = 30,
-    PlantAttemptsPerCycle = 24,
+    HarvestInterval = 1,
+    PlantAttemptsPerCycle = 48,
     Sprinkler = "Common Sprinkler",
     AutoWater = true,
-    StackSpacing = 1.5,
-    StackMaxPlants = 16,
+    StackSpacing = 1.2,
+    StackMaxPlants = 64,
+    BuyLoopInterval = 1,
+    PlantLoopInterval = 0.05,
+    HarvestLoopInterval = 0.1,
+    SellLoopInterval = 0.3,
+    BuyBackoffSec = 5,
+    KeepBudgetSheckles = 0,
+    SeedHoardTarget = 200,
+    QuickProfitMode = false,       -- Chỉ mua seed rẻ (ROI nhanh cho short-term profit)
+    QuickProfitMaxPrice = 1000,    -- Giá seed tối đa khi QuickProfitMode = true
     DeleteNonFarmPlants = false,
     AutoExpand = true,
     AutoCollectGold = true,
@@ -127,11 +151,23 @@ local DEFAULT_CONFIG = {
     AutoUpgradePetSlot = true,
     WebhookUrl = "",
     WebhookInterval = 120,
+    -- Webhook định kỳ 30s: tài khoản, tiền, tổng seed, số pet
+    WebhookStatusInterval = 30,
+    -- Webhook khi collect được seed Gold/Rainbow + tổng số đã collect
+    WebhookOnSeedCollect = true,
+    -- Webhook filter: chỉ thông báo pet/seed theo rarity/name (từ top1 script)
+    WebhookPetRarity = { "Mythic", "Super", "Secret" },
+    WebhookSeedName = {
+        "Dragon's Breath", "Venus Fly Trap", "Pomegranate", "Poison Apple",
+        "Venom Spitter", "Ghost Pepper", "Romanesco", "Moon Bloom",
+    },
     AntiAfk = true,
     StayInBase = true,
+    -- HopServer = false → KHÔNG hop server dưới BẤT CỨ trường hợp nào (dù PetFinder muốn hop)
+    HopServer = true,
     MainLoopDelay = 0.25,
-    RemoteCooldown = 0.12,
-    SellInterval = 5,
+    RemoteCooldown = 0.10,
+    SellInterval = 1,
     ExpandInterval = 12,
     FpsCap = 30,
     LowGraphics = true,
@@ -139,7 +175,7 @@ local DEFAULT_CONFIG = {
     HideGarden3D = true,
     ShowUI = true,
     UIUpdateInterval = 1,
-    InvScanInterval = 2,
+    InvScanInterval = 3,
 }
 
 local function deepMerge(dst, src)
@@ -290,6 +326,7 @@ local Net = require(ReplicatedStorage:WaitForChild("SharedModules"):WaitForChild
 
 local KaitunRunning = true
 local TravelActive = false
+local FarmLoopsStarted = false
 local RemoteLastFire = {}
 local State = {
     phase = "init",
@@ -298,11 +335,21 @@ local State = {
     lastWater = 0,
     lastExtras = 0,
     tutorialDone = false,
+    tutorialStarted = false,
+    tutorialPhase = "",
     lastHop = 0,
     lastSell = 0,
     lastExpand = 0,
     lastWebhook = 0,
+    lastStatusWebhook = 0,
+    lastPetMgmt = 0,
+    lastBuy = 0,
+    lastPlant = 0,
+    lastSell = 0,
     status = "Starting...",
+    -- Tracking seed Gold/Rainbow đã collect
+    goldSeedCollected = 0,
+    rainbowSeedCollected = 0,
     petHuntBackoffUntil = 0,
 }
 
@@ -433,6 +480,60 @@ local function getPlotId(garden)
     return tonumber(garden.Name:match("%d+"))
 end
 
+local SeedToolCache = { list = nil, at = 0 }
+local function getSeedToolsMap()
+    local now = os.clock()
+    if SeedToolCache.list and (now - SeedToolCache.at) < 0.4 then
+        return SeedToolCache.list
+    end
+    local map = {}
+    local function scan(container)
+        if not container then return end
+        for _, tool in container:GetChildren() do
+            if tool:IsA("Tool") then
+                local s = tool:GetAttribute("SeedTool")
+                if s then map[s] = map[s] or tool end
+            end
+        end
+    end
+    scan(LocalPlayer.Backpack)
+    scan(LocalPlayer.Character)
+    SeedToolCache.list = map
+    SeedToolCache.at = now
+    return map
+end
+
+local function countSeedToolTotal()
+    local n = 0
+    local function scan(container)
+        if not container then return end
+        for _, tool in container:GetChildren() do
+            if tool:IsA("Tool") and tool:GetAttribute("SeedTool") then n += 1 end
+        end
+    end
+    scan(LocalPlayer.Backpack)
+    scan(LocalPlayer.Character)
+    return n
+end
+
+local function getPlantableSeedList()
+    local tools = getSeedToolsMap()
+    local out = {}
+    for _, entry in ipairs(ALL_SEEDS_BY_PRICE) do
+        if isSeedEnabled(Config.PlantSeed, entry.name) and tools[entry.name] then
+            table.insert(out, entry)
+        end
+    end
+    return out
+end
+
+local function getSpendableSheckles()
+    local s = getPlayerSheckles()
+    local budget = tonumber(Config.KeepBudgetSheckles) or 0
+    if s <= budget then return 0 end
+    return s - budget
+end
+
 local function getPlayerSheckles()
     local ls = LocalPlayer:FindFirstChild("leaderstats")
     local s = ls and ls:FindFirstChild("Sheckles")
@@ -460,8 +561,13 @@ local function getToolCount()
     return n
 end
 
-local function isBackpackFull()
-    return getToolCount() >= (Config.MaxInventoryTools or 83)
+local ToolCountCache = { n = 0, at = 0 }
+local function getToolCountCached()
+    local now = os.clock()
+    if (now - ToolCountCache.at) < 0.3 then return ToolCountCache.n end
+    ToolCountCache.n = getToolCount()
+    ToolCountCache.at = now
+    return ToolCountCache.n
 end
 
 local function isInventoryFull()
@@ -469,14 +575,25 @@ local function isInventoryFull()
 end
 
 local function shouldBlockBuy()
-    return isInventoryFull() or isBackpackFull()
+    if isInventoryFull() then return true end
+    if getToolCountCached() >= (Config.MaxInventoryTools or 83) - 5 then
+        return countSeedToolTotal() > 0
+    end
+    return false
 end
 
 local function forceSell()
+    local resp
     local ok = pcall(function()
-        Net.NPCS.SellAll:Fire()
+        resp = Net.NPCS.SellAll:Fire()
     end)
-    return ok
+    if ok and resp and resp.Success then
+        State.lastSellPrice = resp.SellPrice or 0
+        State.lastSoldCount = resp.SoldCount or 0
+        State.totalEarned = (State.totalEarned or 0) + (resp.SellPrice or 0)
+        return true
+    end
+    return false
 end
 
 local function getHomePosition()
@@ -501,12 +618,16 @@ local function findToolByAttribute(attrName, value)
     return scan(char) or scan(LocalPlayer.Backpack)
 end
 
+local LastEquippedTool = nil
 local function equipTool(tool)
+    if not tool then return nil end
     local char = LocalPlayer.Character
+    -- Nếu tool đã equipped, return luôn
+    if tool.Parent == char then return tool end
     local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if hum and tool and tool.Parent == LocalPlayer.Backpack then
+    if hum and tool.Parent == LocalPlayer.Backpack then
         hum:EquipTool(tool)
-        task.wait(0.12)
+        task.wait(0.05)
     end
     return tool and tool.Parent == char and tool or nil
 end
@@ -598,33 +719,35 @@ end
 
 local function tryHarvest(garden)
     local folder = garden:FindFirstChild("Plants")
-    if not folder then return false end
-    local did = false
+    if not folder then return 0 end
+    local harvested = 0
+    local myUid = LocalPlayer.UserId
     for _, plant in folder:GetChildren() do
         if not KaitunRunning then break end
         local fruitsFolder = plant:FindFirstChild("Fruits")
         if fruitsFolder then
             for _, fruit in fruitsFolder:GetChildren() do
-                if fruit:GetAttribute("UserId") ~= LocalPlayer.UserId then continue end
-                local plantId = fruit:GetAttribute("PlantId")
-                local fruitId = fruit:GetAttribute("FruitId")
-                if plantId and fruitId then
-                    fireHarvest(plantId, fruitId)
-                    did = true
-                    task.wait(0.05)
+                if fruit:GetAttribute("UserId") == myUid then
+                    local plantId = fruit:GetAttribute("PlantId")
+                    local fruitId = fruit:GetAttribute("FruitId")
+                    if plantId and fruitId then
+                        fireHarvest(plantId, fruitId)
+                        harvested += 1
+                        task.wait(0.08)
+                    end
                 end
             end
-        elseif plant:GetAttribute("UserId") == LocalPlayer.UserId
+        elseif plant:GetAttribute("UserId") == myUid
             and plant:GetAttribute("PlantGrowthReady") == true then
             local plantId = plant:GetAttribute("PlantId")
             if plantId then
                 fireHarvest(plantId, nil)
-                did = true
-                task.wait(0.05)
+                harvested += 1
+                task.wait(0.08)
             end
         end
     end
-    return did
+    return harvested
 end
 
 local function trySell()
@@ -633,38 +756,78 @@ end
 
 local function getSeedShopStock(seedName)
     local pg = LocalPlayer:FindFirstChild("PlayerGui")
-    if not pg then return 0 end
+    if not pg then return nil end
     local shop = pg:FindFirstChild("SeedShop")
-    if not shop then return 0 end
+    if not shop then return nil end
     local frame = shop:FindFirstChild("Frame")
     local normal = frame and frame:FindFirstChild("NormalShop")
-    if not normal then return 0 end
+    if not normal then return nil end
     local item = normal:FindFirstChild(seedName)
     if not item then return 0 end
     local main = item:FindFirstChild("Main_Frame")
     local label = main and main:FindFirstChild("Stock_Text")
-    if not label or not label:IsA("TextLabel") then return 0 end
+    if not label or not label:IsA("TextLabel") then return nil end
     return tonumber(label.Text:match("x(%d+)")) or 0
 end
 
+local BuyBackoff = { untilTs = 0, reason = "" }
 local function tryBuySeedsTiered(maxBuys)
     if not Config.BuySeed.Enable then return 0 end
-    maxBuys = maxBuys or Config.MaxBuysPerCycle or 20
+    -- Backoff: nếu vừa fail, chờ trước khi thử lại
+    if BuyBackoff.untilTs and os.clock() < BuyBackoff.untilTs then
+        return 0
+    end
+    maxBuys = maxBuys or Config.MaxBuysPerCycle or 50
     local bought = 0
+    local ranOutOfMoney = false
+    local totalAvailableStock = 0   -- tổng stock tất cả seed enabled
     for _, entry in ipairs(ALL_SEEDS_BY_PRICE) do
         if bought >= maxBuys then break end
+        if ranOutOfMoney then break end
         if not isSeedEnabled(Config.BuySeed, entry.name) then continue end
-        while bought < maxBuys and KaitunRunning do
-            if shouldBlockBuy() then break end
-            local stock = getSeedShopStock(entry.name)
-            if stock <= 0 then break end
-            if getPlayerSheckles() < entry.price then break end
+        -- QuickProfitMode: chỉ mua seed rẻ để tối ưu short-term profit
+        if Config.QuickProfitMode and entry.price > (Config.QuickProfitMaxPrice or 1000) then
+            continue
+        end
+        -- Đọc stock 1 lần đầu — nếu nil (GUI chưa load) hoặc 0 thì skip
+        local stock = getSeedShopStock(entry.name)
+        if stock == nil then continue end
+        if stock <= 0 then continue end
+        totalAvailableStock += stock
+        local maxAttempts = math.min(stock, maxBuys - bought)
+        local attempts = 0
+        while attempts < maxAttempts and KaitunRunning do
+            if shouldBlockBuy() then return bought end
+            -- Check tiền thực tế mỗi lần (sheckles có thể giảm do plant/harvest khác)
+            local currentSheckles = getPlayerSheckles()
+            if currentSheckles < entry.price then
+                ranOutOfMoney = true
+                break
+            end
             pcall(function()
                 Net.SeedShop.PurchaseSeed:Fire(entry.name)
             end)
             bought += 1
-            task.wait(0.07)
+            attempts += 1
+            task.wait(0.05)
         end
+    end
+    -- Backoff khi không mua được gì — phân biệt lý do
+    if bought == 0 then
+        local backoff = Config.BuyBackoffSec or 5
+        if ranOutOfMoney then
+            BuyBackoff.reason = "out_of_money"
+            -- Hết tiền: backoff dài hơn (10s) để chờ earn tiền từ sell
+            backoff = 10
+        elseif totalAvailableStock == 0 then
+            BuyBackoff.reason = "no_stock"
+            -- Hết stock: backoff ngắn (3s) vì restock có thể xảy ra bất cứ lúc nào
+            backoff = 3
+        else
+            BuyBackoff.reason = "unknown"
+        end
+        BuyBackoff.untilTs = os.clock() + backoff
+        log("Buy backoff " .. backoff .. "s — " .. BuyBackoff.reason)
     end
     return bought
 end
@@ -694,16 +857,30 @@ local function tryPlantOneSeed(garden)
     local pos = findPlantPosition(garden)
     if not pos then return false end
 
+    local tools = getSeedToolsMap()
+    -- Ưu tiên tool đã equipped (tránh equip lại)
+    local char = LocalPlayer.Character
+    for _, entry in ipairs(ALL_SEEDS_BY_PRICE) do
+        if isSeedEnabled(Config.PlantSeed, entry.name) then
+            local seedTool = tools[entry.name]
+            if seedTool and seedTool.Parent == char then
+                pcall(function()
+                    Net.Plant.PlantSeed:Fire(pos, entry.name, seedTool)
+                end)
+                return true
+            end
+        end
+    end
+    -- Fallback: equip tool đầu tiên tìm thấy
     for _, entry in ipairs(ALL_SEEDS_BY_PRICE) do
         if not isSeedEnabled(Config.PlantSeed, entry.name) then continue end
-        local seedTool = findToolByAttribute("SeedTool", entry.name)
+        local seedTool = tools[entry.name]
         if not seedTool then continue end
         seedTool = equipTool(seedTool)
         if not seedTool then continue end
         pcall(function()
             Net.Plant.PlantSeed:Fire(pos, entry.name, seedTool)
         end)
-        task.wait(0.08)
         return true
     end
     return false
@@ -983,7 +1160,21 @@ local function snatchWorldSeedTarget(target)
     TravelActive = false
     if got then
         log("Got " .. target.name .. " seed!")
-        sendWebhook("Snatched **" .. target.name .. "** seed — " .. LocalPlayer.Name)
+        -- Track số lượng seed Gold/Rainbow đã collect
+        if target.name == "Gold" then
+            State.goldSeedCollected = (State.goldSeedCollected or 0) + 1
+        elseif target.name == "Rainbow" then
+            State.rainbowSeedCollected = (State.rainbowSeedCollected or 0) + 1
+        end
+        -- Webhook chi tiết: tên seed + tổng số đã collect
+        if Config.WebhookOnSeedCollect then
+            sendWebhook(("🌟 **%s** nhặt được **%s Seed** | Tổng: Gold ×%d, Rainbow ×%d")
+                :format(LocalPlayer.Name, target.name,
+                    State.goldSeedCollected or 0,
+                    State.rainbowSeedCollected or 0))
+        else
+            sendWebhook("Snatched **" .. target.name .. "** seed — " .. LocalPlayer.Name)
+        end
     end
     return got
 end
@@ -1341,13 +1532,6 @@ local function hasAnyGiftPetEnabled()
     return false
 end
 
-local function canRunTutorial()
-    local mail = Config.GiftMail
-    if type(mail) ~= "table" or mail.Enable ~= true then return false end
-    if not resolveGiftRecipientId() then return false end
-    return hasAnyGiftPetEnabled()
-end
-
 local function tryGiftMailOnce()
     local mail = Config.GiftMail
     if type(mail) ~= "table" or mail.Enable ~= true then return false end
@@ -1366,30 +1550,268 @@ local function tryGiftMailOnce()
     end, mail.IntervalSec or 30)
 end
 
+local function canRunTutorial()
+    local tut = Config.Tutorial
+    if type(tut) ~= "table" or tut.Enable ~= true then return false end
+    if tut.AutoFlow ~= true then
+        -- Legacy: chỉ gửi pet qua GiftMail
+        local mail = Config.GiftMail
+        if type(mail) ~= "table" or mail.Enable ~= true then return false end
+        if not resolveGiftRecipientId() then return false end
+        return hasAnyGiftPetEnabled()
+    end
+    return true
+end
+
+-- ── Tutorial file (Surge Hub/Surge.json) ───────────────────────────────────
+-- writefile/readfile/isfolder/makefiles từ executor. Fallback: in-memory.
+
+local TutorialStore = { data = {}, loaded = false }
+
+local function getTutorialFolderPath()
+    return "Surge Hub"
+end
+local function getTutorialFilePath()
+    return "Surge Hub/Surge.json"
+end
+
+local function loadTutorialFile()
+    if TutorialStore.loaded then return TutorialStore.data end
+    local raw
+    pcall(function()
+        if readfile then raw = readfile(getTutorialFilePath()) end
+    end)
+    if raw and #raw > 0 then
+        local ok, parsed = pcall(function()
+            return HttpService:JSONDecode(raw)
+        end)
+        if ok and type(parsed) == "table" then
+            TutorialStore.data = parsed
+        end
+    end
+    TutorialStore.loaded = true
+    return TutorialStore.data
+end
+
+local function saveTutorialFile()
+    local raw = HttpService:JSONEncode(TutorialStore.data)
+    pcall(function()
+        if not isfolder or not isfolder(getTutorialFolderPath()) then
+            if makefiles then makefiles(getTutorialFolderPath() .. "/") end
+        end
+        if writefile then writefile(getTutorialFilePath(), raw) end
+    end)
+end
+
+local function getAccountKey()
+    return LocalPlayer.Name .. "_" .. tostring(LocalPlayer.UserId)
+end
+
+local function isTutorialDoneInFile()
+    local data = loadTutorialFile()
+    local acc = data[getAccountKey()]
+    if type(acc) ~= "table" then return false end
+    return acc.tutorial == true
+end
+
+local function markTutorialDoneInFile()
+    local data = loadTutorialFile()
+    local key = getAccountKey()
+    if type(data[key]) ~= "table" then data[key] = {} end
+    data[key].account = LocalPlayer.Name
+    data[key].tutorial = true
+    data[key].doneAt = os.time()
+    saveTutorialFile()
+end
+
+-- ── Tutorial flow: buy 1 carrot → plant → harvest (wait inventory +1) → sell ─
+
+local function tutorialCountCarrotTools()
+    local n = 0
+    local function scan(c)
+        if not c then return end
+        for _, t in ipairs(c:GetChildren()) do
+            if t:IsA("Tool") and t:GetAttribute("SeedTool") == Config.Tutorial.SeedName then
+                n += 1
+            end
+        end
+    end
+    scan(LocalPlayer.Backpack)
+    if LocalPlayer.Character then scan(LocalPlayer.Character) end
+    return n
+end
+
+local function tutorialCountFruit()
+    return tonumber(LocalPlayer:GetAttribute("FruitCount")) or 0
+end
+
+local function runAutoTutorialFlow()
+    local tut = Config.Tutorial
+    local seedName = tut.SeedName or "Carrot"
+    State.tutorialPhase = "start"
+
+    -- 1. Mua 1 seed
+    State.tutorialPhase = "buy"
+    log("Tutorial: mua 1 " .. seedName)
+    local boughtOnce = false
+    for _ = 1, 20 do
+        if not KaitunRunning then return false end
+        if tutorialCountCarrotTools() > 0 then boughtOnce = true; break end
+        local stock = getSeedShopStock(seedName)
+        if stock == nil then
+            log("Tutorial: SeedShop GUI chưa load, chờ...")
+            task.wait(0.5)
+        elseif stock <= 0 then
+            log("Tutorial: " .. seedName .. " hết stock, chờ restock...")
+            task.wait(1)
+        else
+            pcall(function() Net.SeedShop.PurchaseSeed:Fire(seedName) end)
+            task.wait(0.3)
+        end
+    end
+    if not boughtOnce then
+        log("Tutorial: không mua được " .. seedName .. " — retry sau")
+        State.tutorialPhase = "buy_failed"
+        return false
+    end
+
+    -- 2. Plant seed
+    State.tutorialPhase = "plant"
+    local garden = getMyGarden()
+    if not garden then
+        log("Tutorial: không tìm thấy garden — retry sau")
+        return false
+    end
+    log("Tutorial: trồng " .. seedName)
+    local planted = false
+    for _ = 1, 10 do
+        if not KaitunRunning then return false end
+        local pos = findPlantPosition(garden)
+        if not pos then
+            log("Tutorial: không còn chỗ plant")
+            break
+        end
+        local tools = getSeedToolsMap()
+        local tool = tools[seedName]
+        if not tool then
+            log("Tutorial: mất seed tool?")
+            break
+        end
+        tool = equipTool(tool) or tool
+        pcall(function() Net.Plant.PlantSeed:Fire(pos, seedName, tool) end)
+        task.wait(0.4)
+        -- Check plant đã xuất hiện
+        local plantsFolder = garden:FindFirstChild("Plants")
+        if plantsFolder then
+            for _, p in ipairs(plantsFolder:GetChildren()) do
+                if p:GetAttribute("UserId") == LocalPlayer.UserId then
+                    planted = true; break
+                end
+            end
+        end
+        if planted then break end
+        task.wait(0.3)
+    end
+    if not planted then
+        log("Tutorial: plant fail — retry sau")
+        State.tutorialPhase = "plant_failed"
+        return false
+    end
+
+    -- 3. Harvest — đợi plant ready rồi harvest (đợi inventory fruit +1)
+    State.tutorialPhase = "harvest_wait"
+    log("Tutorial: đợi " .. seedName .. " ready để harvest")
+    local fruitBefore = tutorialCountFruit()
+    local timeout = tut.HarvestTimeout or 60
+    local t0 = os.clock()
+    local harvested = false
+    while KaitunRunning and (os.clock() - t0) < timeout do
+        local plantsFolder = garden:FindFirstChild("Plants")
+        local hasReady = false
+        if plantsFolder then
+            for _, p in ipairs(plantsFolder:GetChildren()) do
+                if p:GetAttribute("UserId") == LocalPlayer.UserId then
+                    local ff = p:FindFirstChild("Fruits")
+                    if (ff and #ff:GetChildren() > 0)
+                        or p:GetAttribute("PlantGrowthReady") == true then
+                        hasReady = true; break
+                    end
+                end
+            end
+        end
+        if hasReady then
+            State.tutorialPhase = "harvest"
+            tryHarvest(garden)
+            task.wait(0.5)
+            if tutorialCountFruit() > fruitBefore then
+                harvested = true
+                break
+            end
+        end
+        task.wait(0.5)
+    end
+    if not harvested then
+        log("Tutorial: harvest timeout — retry sau")
+        State.tutorialPhase = "harvest_failed"
+        return false
+    end
+    log("Tutorial: harvested! fruit=" .. tutorialCountFruit())
+
+    -- 4. Sell
+    State.tutorialPhase = "sell"
+    log("Tutorial: bán fruit")
+    for _ = 1, 10 do
+        if not KaitunRunning then break end
+        if tutorialCountFruit() <= 0 then break end
+        forceSell()
+        task.wait(0.5)
+    end
+
+    -- 5. Mark done + save file
+    State.tutorialPhase = "done"
+    markTutorialDoneInFile()
+    State.tutorialDone = true
+    log("Tutorial: DONE — flow chính bắt đầu")
+    return true
+end
+
 local function tryAutoTutorialSendPet()
-    if State.tutorialDone then return false end
+    if State.tutorialDone then return true end
     local tut = Config.Tutorial
     if type(tut) ~= "table" or tut.Enable ~= true then
         State.tutorialDone = true
-        return false
+        return true
     end
+
+    -- Nếu file đã mark done → skip
+    if isTutorialDoneInFile() then
+        State.tutorialDone = true
+        log("Tutorial: đã done trong Surge.json — skip")
+        return true
+    end
+
+    -- AutoFlow: buy carrot → plant → harvest → sell
+    if tut.AutoFlow == true then
+        return runAutoTutorialFlow()
+    end
+
+    -- Legacy: gửi pet đầu tiên qua GiftMail
     if tut.SendFirstPet ~= true then
         State.tutorialDone = true
-        return false
+        return true
     end
     if not canRunTutorial() then
         State.tutorialDone = true
         log("Tutorial skipped (GiftMail/recipient chưa setup)")
-        return false
+        return true
     end
-
     log("Tutorial: gửi pet đầu tiên qua GiftMail")
     if tryGiftMailOnce() then
+        markTutorialDoneInFile()
         State.tutorialDone = true
         log("Tutorial send done")
         return true
     end
-
     if Config.AutoOpenEggs then
         tryOpenEgg()
         tryBuyEssentials()
@@ -1401,6 +1823,7 @@ end
 -- ── Server hop ──────────────────────────────────────────────────────────────
 
 local function shouldHopForPet()
+    if not Config.HopServer then return false end  -- chặn hop khi HopServer = false
     if not isPetFinderEnabled() then return false end
     local petName = getActiveFinderPet()
     if not petName then return false end
@@ -1411,6 +1834,11 @@ local function shouldHopForPet()
 end
 
 local function hopServer()
+    if not Config.HopServer then
+        log("Hop blocked by config (HopServer = false)")
+        State.lastHop = os.clock()  -- tránh re-trigger liên tục
+        return false
+    end
     local petName = getActiveFinderPet() or "?"
     State.lastHop = os.clock()
     log("Hopping server (£" .. fmtMoney(getPetFinderHopMoney()) .. "+, no " .. petName .. " here)")
@@ -1458,10 +1886,55 @@ local function sendWebhook(msg)
             Headers = { ["Content-Type"] = "application/json" },
             Body = HttpService:JSONEncode({
                 content = msg,
-                username = "GAG2 Kaitun",
+                username = "Surge Hub",
             }),
         })
     end)
+end
+
+-- Helper đếm tổng seed (seed tools) trong inventory
+local function countTotalSeeds()
+    local n = 0
+    local function scan(c)
+        if not c then return end
+        for _, t in ipairs(c:GetChildren()) do
+            if t:IsA("Tool") and t:GetAttribute("SeedTool") then n += 1 end
+        end
+    end
+    scan(LocalPlayer.Backpack)
+    if LocalPlayer.Character then scan(LocalPlayer.Character) end
+    return n
+end
+
+-- Đếm seed Gold/Rainbow variant đang có trong inventory
+local function countGoldRainbowSeeds()
+    local gold, rainbow = 0, 0
+    local function scan(c)
+        if not c then return end
+        for _, t in ipairs(c:GetChildren()) do
+            if t:IsA("Tool") and t:GetAttribute("SeedTool") then
+                if t:GetAttribute("GoldSeed") == true then gold += 1 end
+                if t:GetAttribute("RainbowSeed") == true then rainbow += 1 end
+            end
+        end
+    end
+    scan(LocalPlayer.Backpack)
+    if LocalPlayer.Character then scan(LocalPlayer.Character) end
+    return gold, rainbow
+end
+
+-- Webhook status định kỳ: tài khoản, tiền, tổng seed, số pet, gold/rainbow
+local function sendStatusWebhook()
+    local sheckles = getPlayerSheckles()
+    local totalSeeds = countTotalSeeds()
+    local petCount = countOwnedPets()
+    local goldInv, rainbowInv = countGoldRainbowSeeds()
+    local msg = ("📊 **%s** | £%s | Seeds: %d | Pets: %d | Gold seed: %d (collected %d) | Rainbow seed: %d (collected %d) | Phase: `%s`")
+        :format(LocalPlayer.Name, tostring(sheckles), totalSeeds, petCount,
+            goldInv, State.goldSeedCollected or 0,
+            rainbowInv, State.rainbowSeedCollected or 0,
+            State.phase)
+    sendWebhook(msg)
 end
 
 -- ── Performance / FPS / Hide 3D ─────────────────────────────────────────────
@@ -1469,12 +1942,28 @@ end
 local Lighting = game:GetService("Lighting")
 local FFLAG_LIST = {
     { "DFIntTaskSchedulerTargetFps", function() return tostring(Config.FpsCap or 30) end },
+    -- Texture quality: xóa texture, giảm chất lượng
     { "DFIntTextureQualityOverride", "0" },
     { "DFIntPerformanceControlTextureQualityBestUtility", "0" },
+    { "FIntDebugForceMSAA", "0" },
     { "FIntRenderShadowIntensity", "0" },
+    { "FIntRenderShadowDistance", "0" },
+    { "FIntRenderLocalShadowFade", "0" },
+    -- LoD: giảm chi tiết mesh từ xa
     { "DFIntCSGLevelOfDetailSwitchingDistance", "1" },
+    { "DFIntCSGLevelOfDetailSwitchingDistanceMedium", "1" },
+    { "DFIntCSGLevelOfDetailSwitchingDistanceFar", "1" },
+    { "FIntRenderingQuality", "1" },
+    -- FRM (frame rate manager) — ép render cực thấp
     { "FIntFRMMaxFramesToBeBehindBeforeIdle", "1" },
+    { "FIntFRMinimumGraphiteDistance", "0" },
     { "DFIntMaxFrameBufferSize", "1" },
+    -- Particle/decal: tắt
+    { "FIntRGUBatchSize", "1" },
+    -- Anti-aliasing off
+    { "FIntAntiAliasingMode", "0" },
+    -- Material quality thấp
+    { "FIntMaterialQuality", "0" },
 }
 
 local function applyFFlags()
@@ -1492,6 +1981,7 @@ local function clearFFlags()
 end
 
 local SavedLighting = {}
+local isPlantVisual  -- forward declare (defined bên dưới)
 
 local function applyLowGraphics()
     pcall(function()
@@ -1512,12 +2002,44 @@ local function applyLowGraphics()
             terrain.WaterWaveSpeed = 0
             terrain.WaterReflectance = 0
             terrain.WaterTransparency = 1
+            terrain.Decoration = false
         end
     end)
     pcall(function()
         settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
         settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Level04
         settings().Rendering.EnableFRM = true
+        settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Level04
+    end)
+    -- Xóa texture toàn workspace: ép material về SmoothPlastic, tắt Decal/Texture
+    pcall(function()
+        for _, inst in ipairs(workspace:GetDescendants()) do
+            if inst:IsA("BasePart") then
+                -- Bỏ qua plant visual (đã handle riêng bởi Hide3D)
+                if not isPlantVisual(inst) then
+                    pcall(function() inst.Material = Enum.Material.SmoothPlastic end)
+                    pcall(function() inst.CastShadow = false end)
+                    pcall(function() inst.Reflectance = 0 end)
+                end
+            elseif inst:IsA("Decal") or inst:IsA("Texture") then
+                pcall(function() inst.Transparency = 1 end)
+            elseif inst:IsA("ParticleEmitter") or inst:IsA("Trail") or inst:IsA("Beam") then
+                pcall(function() inst.Enabled = false end)
+            elseif inst:IsA("Fire") or inst:IsA("Smoke") or inst:IsA("Sparkles") then
+                pcall(function() inst.Enabled = false end)
+            end
+        end
+    end)
+    -- Theo dõi instance mới thêm vào workspace để xóa texture (spawn plants, effects)
+    pcall(function()
+        PerfState.texConn = workspace.DescendantAdded:Connect(function(inst)
+            if inst:IsA("ParticleEmitter") or inst:IsA("Trail") or inst:IsA("Beam")
+                or inst:IsA("Fire") or inst:IsA("Smoke") or inst:IsA("Sparkles") then
+                pcall(function() inst.Enabled = false end)
+            elseif inst:IsA("Decal") or inst:IsA("Texture") then
+                pcall(function() inst.Transparency = 1 end)
+            end
+        end)
     end)
     PerfState.lowGfxOn = true
 end
@@ -1534,10 +2056,14 @@ local function clearLowGraphics()
             Lighting.Brightness = SavedLighting.Brightness
         end
     end)
+    pcall(function()
+        if PerfState.texConn then PerfState.texConn:Disconnect() end
+        PerfState.texConn = nil
+    end)
     PerfState.lowGfxOn = false
 end
 
-local function isPlantVisual(inst)
+isPlantVisual = function(inst)
     if not inst then return false end
     if inst:IsDescendantOf(Gardens) then
         local plants = inst:FindFirstAncestor("Plants")
@@ -1653,6 +2179,33 @@ local function disableHideGarden3D()
     PerfState.hiddenParts = {}
 end
 
+local stopKaitun
+local function syncKaitunGenv()
+    local g = getgenv and getgenv() or _G
+    g.KaitunRunning = KaitunRunning
+    g.KaitunState = State
+    g.KaitunStop = stopKaitun
+end
+
+stopKaitun = function()
+    if not KaitunRunning then return end
+    KaitunRunning = false
+    cancelMovement()
+    TravelActive = false
+    WorldSeedSnatcher.claiming = false
+    for _, conn in ipairs(WorldSeedSnatcher.conns) do
+        pcall(function() conn:Disconnect() end)
+    end
+    WorldSeedSnatcher.conns = {}
+    if PerfState.hideGarden3D then disableHideGarden3D() end
+    if PerfState.lowGfxOn then clearLowGraphics() end
+    if PerfState.fflagsOn then clearFFlags() end
+    State.phase = "stopped"
+    log("Stopped")
+    syncKaitunGenv()
+    sendWebhook("Surge Hub stopped — " .. LocalPlayer.Name)
+end
+
 local function classifyTool(tool)
     if not tool:IsA("Tool") then return "Other" end
     if tool:GetAttribute("SeedTool") then return "Seeds" end
@@ -1746,26 +2299,30 @@ local function buildDashboardText()
     local garden = getMyGardenCached()
     local activePet = getActiveFinderPet() or getOwnedFinderPet() or "—"
     local ownsActive = activePet ~= "—" and playerOwnsPet(activePet)
+    local now = os.clock()
+    local sinceBuy = math.floor(now - (State.lastBuy or 0))
+    local sincePlant = math.floor(now - (State.lastPlant or 0))
+    local sinceHarvest = math.floor(now - (State.lastHarvest or 0))
+    local sinceSell = math.floor(now - (State.lastSell or 0))
     return table.concat({
         "FPS " .. PerfState.currentFps .. "  |  cap " .. Config.FpsCap,
         onFlag("FFlags", PerfState.fflagsOn) .. "  |  " .. onFlag("LowGFX", PerfState.lowGfxOn) .. "  |  " .. onFlag("Hide3D", PerfState.hideGarden3D),
         "────────────────────────",
-        "Phase: " .. State.phase .. "  |  " .. State.status,
-        "Farm: continuous  |  sell every " .. (Config.SellInterval or 5) .. "s"
-            .. " (last " .. math.floor(os.clock() - (State.lastSell or 0)) .. "s)",
-        "Tools: " .. getToolCount() .. "/" .. (Config.MaxInventoryTools or 83)
-            .. "  |  harvest in " .. math.max(0, math.ceil((State.lastHarvest + Config.HarvestCycleInterval) - os.clock())) .. "s",
+        "Phase: " .. State.phase .. (State.tutorialPhase and State.tutorialPhase ~= "" and (" [" .. State.tutorialPhase .. "]") or ""),
+        "Buy " .. sinceBuy .. "s | Plant " .. sincePlant .. "s | Harv " .. sinceHarvest .. "s",
+        "Sell " .. sinceSell .. "s ago  |  loops: parallel",
+        "Tools: " .. getToolCountCached() .. "/" .. (Config.MaxInventoryTools or 83)
+            .. "  |  fruit " .. getFruitCount() .. "/" .. getMaxFruitCapacity(),
         "£" .. fmtMoney(getPlayerSheckles()) .. "  |  " .. getMovementMode() .. " mode",
         "Garden: " .. (garden and garden.Name or "—") .. "  |  Night: " .. tostring(NightVal.Value),
         "Pet: " .. activePet .. (ownsActive and " ✓" or " ✗")
             .. "  |  finder: " .. (isPetFinderEnabled() and "ON" or "OFF"),
+        "Gold seed: " .. (State.goldSeedCollected or 0) .. "  |  Rainbow seed: " .. (State.rainbowSeedCollected or 0),
         "────────────────────────",
-        "Inv  fruit:" .. getFruitCount() .. "/" .. getMaxFruitCapacity()
-            .. "  seed:" .. counts.Seeds .. "  pet:" .. counts.Pets .. "  egg:" .. counts.Eggs,
-        "     fruit:" .. counts.Fruits .. "  gear:" .. counts.Gear .. "  crate:" .. counts.Crates,
-        "     total:" .. counts.Total,
+        "Inv seed:" .. counts.Seeds .. "  pet:" .. counts.Pets .. "  egg:" .. counts.Eggs,
+        "    fruit:" .. counts.Fruits .. "  gear:" .. counts.Gear .. "  total:" .. counts.Total,
         "World plants: " .. countWorldPlantsCached() .. "  hidden: " .. countHiddenParts(),
-        "[RightShift] hide  |  click 3D/GFX/FF toggles",
+        "[RightShift] hide  |  [STOP] quit  |  3D/GFX/FF toggles",
     }, "\n")
 end
 
@@ -1839,8 +2396,27 @@ local function createKaitunUI()
     header.TextSize = 14
     header.TextXAlignment = Enum.TextXAlignment.Left
     header.TextColor3 = Color3.fromRGB(126, 217, 87)
-    header.Text = "GAG2 KAITUN"
+    header.Text = "SURGE HUB"
     header.Parent = panel
+
+    local stopBtn = Instance.new("TextButton")
+    stopBtn.Size = UDim2.fromOffset(44, 22)
+    stopBtn.Position = UDim2.fromOffset(118, 6)
+    stopBtn.BackgroundColor3 = Color3.fromRGB(120, 40, 45)
+    stopBtn.BorderSizePixel = 0
+    stopBtn.Font = Enum.Font.GothamBold
+    stopBtn.TextSize = 11
+    stopBtn.Text = "STOP"
+    stopBtn.TextColor3 = Color3.fromRGB(255, 220, 220)
+    stopBtn.AutoButtonColor = false
+    stopBtn.Parent = panel
+    local stopCorner = Instance.new("UICorner")
+    stopCorner.CornerRadius = UDim.new(0, 5)
+    stopCorner.Parent = stopBtn
+    stopBtn.MouseButton1Click:Connect(function()
+        stopBtn.Active = false
+        stopKaitun()
+    end)
 
     makeToggle(panel, "3D", 168, Config.HideGarden3D, function(v)
         if v then enableHideGarden3D() else disableHideGarden3D() end
@@ -1949,74 +2525,144 @@ end
 
 local function hasPlantableSeeds()
     if not Config.PlantSeed.Enable then return false end
-    for _, entry in ipairs(ALL_SEEDS_BY_PRICE) do
-        if isSeedEnabled(Config.PlantSeed, entry.name) and findToolByAttribute("SeedTool", entry.name) then
-            return true
-        end
-    end
-    return false
+    return #getPlantableSeedList() > 0
 end
 
-local function runFarmTick(garden)
-    local actions = {}
-
-    if hasPlantableSeeds() then
-        local planted = 0
-        for _ = 1, Config.PlantAttemptsPerTick or 8 do
-            if not tryPlantOneSeed(garden) then break end
-            planted += 1
-        end
-        if planted > 0 then
-            State.phase = "plant"
-            table.insert(actions, "plant x" .. planted)
-        end
-    end
-
-    if not shouldBlockBuy() and Config.BuySeed.Enable then
-        local bought = tryBuySeedsTiered(Config.MaxBuysPerTick or 3)
-        if bought > 0 then
-            State.phase = "buy"
-            table.insert(actions, "buy x" .. bought)
-        end
-    end
-
-    if os.clock() - State.lastHarvest >= Config.HarvestCycleInterval then
-        tryHarvest(garden)
-        State.lastHarvest = os.clock()
-        State.phase = "harvest"
-        table.insert(actions, "harvest")
-    end
-
-    if os.clock() - State.lastWater >= 45 then
-        tryWater(garden)
-        trySprinkler(garden)
-        State.lastWater = os.clock()
-    end
-
-    if os.clock() - (State.lastExtras or 0) >= 90 then
-        tryBuyEssentials()
-        if Config.AutoOpenEggs then tryOpenEgg() end
-        State.lastExtras = os.clock()
-    end
-
-    if Config.DeleteNonFarmPlants then
-        tryDeletePlants(garden)
-    end
-
-    State.status = #actions > 0 and table.concat(actions, " | ") or "farm loop"
-end
-
-local function startAutoSellLoop()
+-- Plant loop: trồng ngay khi có seed + còn chỗ
+local function startPlantLoop()
     task.spawn(function()
         while KaitunRunning do
-            forceSell()
-            State.lastSell = os.clock()
-            task.wait(Config.SellInterval or 5)
+            if WorldSeedSnatcher.claiming then
+                task.wait(0.1)
+                continue
+            end
+            if Config.PlantSeed.Enable then
+                local garden = getMyGardenCached()
+                if garden and not isInventoryFull() then
+                    local planted = 0
+                    local maxPerTick = Config.PlantAttemptsPerTick or 32
+                    for _ = 1, maxPerTick do
+                        if not tryPlantOneSeed(garden) then break end
+                        planted += 1
+                    end
+                    if planted > 0 then
+                        State.phase = "plant"
+                        State.lastPlant = os.clock()
+                    end
+                end
+            end
+            task.wait(Config.PlantLoopInterval or 0.05)
         end
     end)
 end
 
-log("Kaitun started | mode=" .. getMovementMode() .. " | finder=" .. table.concat(getPetFinderQueue(), ", "))
+-- Buy loop: mua all seed khi còn slot + tiền (có backoff khi hết tiền)
+local function startBuyLoop()
+    task.spawn(function()
+        while KaitunRunning do
+            if WorldSeedSnatcher.claiming then
+                task.wait(0.1)
+                continue
+            end
+            if Config.BuySeed.Enable and not shouldBlockBuy() then
+                local bought = tryBuySeedsTiered(Config.MaxBuysPerTick or 25)
+                if bought > 0 then
+                    State.phase = "buy"
+                    State.lastBuy = os.clock()
+                end
+            end
+            task.wait(Config.BuyLoopInterval or 1)
+        end
+    end)
+end
+
+-- Harvest loop: thu hoạch ngay khi có plant ready (poll nhanh, không chờ interval)
+local function startHarvestLoop()
+    task.spawn(function()
+        while KaitunRunning do
+            if WorldSeedSnatcher.claiming then
+                task.wait(0.1)
+                continue
+            end
+            local garden = getMyGardenCached()
+            if garden then
+                -- Check nhanh có plant ready không trước khi harvest (tránh scan không)
+                local plants = garden:FindFirstChild("Plants")
+                local hasReady = false
+                if plants then
+                    for _, plant in ipairs(plants:GetChildren()) do
+                        if plant:GetAttribute("UserId") == LocalPlayer.UserId then
+                            local fruitsFolder = plant:FindFirstChild("Fruits")
+                            if (fruitsFolder and #fruitsFolder:GetChildren() > 0)
+                                or plant:GetAttribute("PlantGrowthReady") == true then
+                                hasReady = true
+                                break
+                            end
+                        end
+                    end
+                end
+                if hasReady then
+                    local harvested = tryHarvest(garden)
+                    if harvested > 0 then
+                        State.phase = "harvest"
+                        State.lastHarvest = os.clock()
+                    end
+                end
+            end
+            task.wait(Config.HarvestLoopInterval or 0.1)
+        end
+    end)
+end
+
+-- Sell loop: sell NGAY khi có fruit (poll nhanh)
+local function startSellLoop()
+    task.spawn(function()
+        while KaitunRunning do
+            local fc = getFruitCount()
+            if fc > 0 then
+                if forceSell() then
+                    State.lastSell = os.clock()
+                end
+            end
+            task.wait(Config.SellLoopInterval or 0.3)
+        end
+    end)
+end
+
+-- Maintenance loop: water/sprinkler/extras/pet/delete (ít thường xuyên)
+local function startMaintenanceLoop()
+    task.spawn(function()
+        while KaitunRunning do
+            local garden = getMyGardenCached()
+            if garden and not WorldSeedSnatcher.claiming then
+                if os.clock() - State.lastWater >= 45 then
+                    if Config.AutoWater ~= false then tryWater(garden) end
+                    trySprinkler(garden)
+                    State.lastWater = os.clock()
+                end
+                if os.clock() - (State.lastExtras or 0) >= 60 then
+                    tryBuyEssentials()
+                    State.lastExtras = os.clock()
+                end
+                if os.clock() - (State.lastPetMgmt or 0) >= 20 then
+                    tryPetManagement()
+                    State.lastPetMgmt = os.clock()
+                end
+                if Config.DeleteNonFarmPlants then
+                    tryDeletePlants(garden)
+                end
+            end
+            task.wait(2)
+        end
+    end)
+end
+
+local function startAutoSellLoop()
+    startSellLoop()
+end
+
+log("Surge Hub started | mode=" .. getMovementMode() .. " | finder=" .. table.concat(getPetFinderQueue(), ", "))
+syncKaitunGenv()
 State.lastHarvest = os.clock()
 createKaitunUI()
 startFpsTracker()
@@ -2024,8 +2670,9 @@ startUIUpdater()
 applyOptimizations()
 startAntiAfk()
 startWorldSeedSnatcher()
-startAutoSellLoop()
-sendWebhook("Kaitun started — " .. LocalPlayer.Name .. " | £" .. tostring(getPlayerSheckles()))
+-- Farm loops (buy/plant/harvest/sell/maintenance) sẽ start SAU khi tutorial done
+-- (xem main orchestrator). Nếu tutorial disable thì start ngay.
+sendWebhook("Surge Hub started — " .. LocalPlayer.Name .. " | £" .. tostring(getPlayerSheckles()))
 
 task.spawn(function()
     while KaitunRunning and Config.AutoExpand do
@@ -2036,12 +2683,9 @@ end)
 
 task.spawn(function()
     while KaitunRunning do
-        if os.clock() - State.lastWebhook >= Config.WebhookInterval then
-            State.lastWebhook = os.clock()
-            local garden = getMyGarden()
-            sendWebhook(("**%s** | £%s | Phase: `%s` | Night: `%s` | Garden: `%s`")
-                :format(LocalPlayer.Name, tostring(getPlayerSheckles()), State.phase,
-                    tostring(NightVal.Value), garden and garden.Name or "—"))
+        if os.clock() - State.lastStatusWebhook >= (Config.WebhookStatusInterval or 30) then
+            State.lastStatusWebhook = os.clock()
+            pcall(sendStatusWebhook)
         end
         task.wait(5)
     end
@@ -2065,6 +2709,14 @@ task.spawn(function()
     end
 end)
 
+-- Nếu tutorial disable hoặc đã done trong file → mark done ngay để farm loops start
+if not (Config.Tutorial and Config.Tutorial.Enable) then
+    State.tutorialDone = true
+elseif Config.Tutorial.AutoFlow == true and isTutorialDoneInFile() then
+    State.tutorialDone = true
+    log("Tutorial: đã done trong Surge.json — skip, farm loops start ngay")
+end
+
 -- Main orchestrator
 while KaitunRunning do
     if WorldSeedSnatcher.claiming then
@@ -2082,6 +2734,17 @@ while KaitunRunning do
         if not State.tutorialDone then
             continue
         end
+    end
+
+    -- Start farm loops SAU khi tutorial done (chỉ 1 lần)
+    if not FarmLoopsStarted then
+        FarmLoopsStarted = true
+        log("Starting farm loops (buy/plant/harvest/sell/maintenance)")
+        startBuyLoop()
+        startPlantLoop()
+        startHarvestLoop()
+        startSellLoop()
+        startMaintenanceLoop()
     end
 
     if isPetFinderEnabled()
@@ -2105,7 +2768,15 @@ while KaitunRunning do
     end
 
     if garden then
-        runFarmTick(garden)
+        -- Farm work chạy ở các background loop song song.
+        -- Main orchestrator chỉ lo tutorial + pet finder/hop.
+        -- Sinh trạng thái farm tổng hợp cho UI.
+        local elapsed = os.clock() - math.max(State.lastBuy or 0, State.lastPlant or 0, State.lastHarvest or 0)
+        if elapsed < 1 then
+            State.status = ("buy/plant/harvest active | £%s"):format(fmtMoney(getPlayerSheckles()))
+        else
+            State.status = "farm loops running"
+        end
     else
         State.phase = "waiting_garden"
         log("Waiting for garden...")
@@ -2114,4 +2785,5 @@ while KaitunRunning do
     task.wait(Config.MainLoopDelay)
 end
 
+syncKaitunGenv()
 log("Kaitun stopped")
