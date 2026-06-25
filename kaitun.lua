@@ -1179,6 +1179,8 @@ local function snatchWorldSeedTarget(target)
         elseif target.name == "Rainbow" then
             State.rainbowSeedCollected = (State.rainbowSeedCollected or 0) + 1
         end
+        -- Persist count ra file (chống mất khi re-execute)
+        pcall(saveSeedCountsToFile)
         -- Webhook embed chi tiết: tách riêng Gold/Rainbow
         if Config.WebhookOnSeedCollect then
             local color, emoji, label
@@ -1652,6 +1654,24 @@ local function markTutorialDoneInFile()
     data[key].account = LocalPlayer.Name
     data[key].tutorial = true
     data[key].doneAt = os.time()
+    saveTutorialFile()
+end
+
+-- Persist gold/rainbow seed count qua re-execute (lưu chung Surge.json)
+local function loadSeedCountsFromFile()
+    local data = loadTutorialFile()
+    local acc = data[getAccountKey()]
+    if type(acc) ~= "table" then return 0, 0 end
+    return tonumber(acc.goldSeedCollected) or 0, tonumber(acc.rainbowSeedCollected) or 0
+end
+
+local function saveSeedCountsToFile()
+    local data = loadTutorialFile()
+    local key = getAccountKey()
+    if type(data[key]) ~= "table" then data[key] = {} end
+    data[key].account = LocalPlayer.Name
+    data[key].goldSeedCollected = State.goldSeedCollected or 0
+    data[key].rainbowSeedCollected = State.rainbowSeedCollected or 0
     saveTutorialFile()
 end
 
@@ -2768,6 +2788,16 @@ sendWebhookEmbed(
 )
 State.startTime = os.time()
 State.lastRejoinNotified = os.time()
+
+-- Load gold/rainbow seed count đã persist từ file (chống reset khi re-execute)
+do
+    local ok, g, r = pcall(loadSeedCountsFromFile)
+    if ok and g and r then
+        if (State.goldSeedCollected or 0) < g then State.goldSeedCollected = g end
+        if (State.rainbowSeedCollected or 0) < r then State.rainbowSeedCollected = r end
+        log(("Loaded seed counts from Surge.json: Gold=%d Rainbow=%d"):format(g, r))
+    end
+end
 
 -- Phát hiện acc vào lại game (rejoin/respawn): gửi embed webhook, KHÔNG ping ai
 task.spawn(function()
