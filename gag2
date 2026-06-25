@@ -1,8 +1,7 @@
 --[[
   GAG2 Kaitun — Auto nuôi acc
 
-  getgenv().KaitunConfig = { ... }  -- merge sâu, xem DEFAULT bên dưới
-  getgenv().movement_mode = "legit" | "cheat"
+  getgenv().KaitunConfig = { MovementMode = "legit" | "cheat", ... }
   loadstring(readfile("kaitun.lua"))()
 ]]
 
@@ -244,8 +243,10 @@ local function resolveGiftRecipientId()
     end
 end
 
-if getgenv().movement_mode == nil then
+if Config.MovementMode then
     getgenv().movement_mode = Config.MovementMode
+elseif getgenv().movement_mode == nil then
+    getgenv().movement_mode = "cheat"
 end
 
 -- ── Lightweight dashboard UI (no WindUI / no HttpGet) ─────────────────────────
@@ -288,7 +289,7 @@ local TravelActive = false
 local RemoteLastFire = {}
 local State = {
     phase = "init",
-    farmPhase = "buy_plant",
+    farmPhase = "buy",
     nextHarvestAt = 0,
     tutorialDone = false,
     lastHop = 0,
@@ -296,7 +297,10 @@ local State = {
     lastExpand = 0,
     lastWebhook = 0,
     status = "Starting...",
+    petHuntBackoffUntil = 0,
 }
+
+local PetHuntFails = {}
 
 -- ── Logging ─────────────────────────────────────────────────────────────────
 
@@ -427,6 +431,27 @@ local function getPlayerSheckles()
     local ls = LocalPlayer:FindFirstChild("leaderstats")
     local s = ls and ls:FindFirstChild("Sheckles")
     return s and s.Value or 0
+end
+
+local function getFruitCount()
+    return tonumber(LocalPlayer:GetAttribute("FruitCount")) or 0
+end
+
+local function getMaxFruitCapacity()
+    return tonumber(LocalPlayer:GetAttribute("MaxFruitCapacity")) or 100
+end
+
+local function isInventoryFull()
+    return getFruitCount() >= getMaxFruitCapacity()
+end
+
+local function forceSell()
+    if getFruitCount() <= 0 then return false end
+    local ok = pcall(function()
+        Net.NPCS.SellAll:Fire()
+    end)
+    task.wait(0.25)
+    return ok
 end
 
 local function getHomePosition()
@@ -567,24 +592,40 @@ local function tryHarvest(garden)
 end
 
 local function trySell()
-    return fireRemote("sell", function()
-        Net.NPCS.SellAll:InvokeServer()
-    end, Config.SellInterval)
+    return forceSell()
 end
 
-local function tryBuyAllSeedsAffordable()
-    if not Config.BuySeed.Enable then return 0 end
+local function getSeedShopStock(seedName)
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if not pg then return 0 end
+    local shop = pg:FindFirstChild("SeedShop")
+    if not shop then return 0 end
+    local frame = shop:FindFirstChild("Frame")
+    local normal = frame and frame:FindFirstChild("NormalShop")
+    if not normal then return 0 end
+    local item = normal:FindFirstChild(seedName)
+    if not item then return 0 end
+    local main = item:FindFirstChild("Main_Frame")
+    local label = main and main:FindFirstChild("Stock_Text")
+    if not label or not label:IsA("TextLabel") then return 0 end
+    return tonumber(label.Text:match("x(%d+)")) or 0
+end
 
+local function tryBuySeedsTiered()
+    if not Config.BuySeed.Enable then return 0 end
     local bought = 0
     for _, entry in ipairs(ALL_SEEDS_BY_PRICE) do
         if not isSeedEnabled(Config.BuySeed, entry.name) then continue end
-        if getPlayerSheckles() >= entry.price then
-            if fireRemote("seedbuy_" .. entry.name, function()
+        while KaitunRunning do
+            if isInventoryFull() then break end
+            local stock = getSeedShopStock(entry.name)
+            if stock <= 0 then break end
+            if getPlayerSheckles() < entry.price then break end
+            pcall(function()
                 Net.SeedShop.PurchaseSeed:Fire(entry.name)
-            end, 0.06) then
-                bought += 1
-            end
-            task.wait(0.06)
+            end)
+            bought += 1
+            task.wait(0.07)
         end
     end
     return bought
@@ -979,7 +1020,44 @@ end
 
 local function parsePromptPrice(text)
     if not text then return end
-    return tonumber(text:gsub("[^%d]", ""))
+    local digits = text:gsub("[^%d]", "")
+    if digits == "" then return end
+    return tonumber(digits)
+end
+
+local function getWildPetPrice(target)
+    if not target then return end
+    local ref = target.ref
+    local root = (ref and ref:FindFirstChild("RootPart")) or target.part
+    if root then
+        local attr = root:GetAttribute("Price")
+        if type(attr) == "number" then return attr end
+    end
+    if target.price then return target.price end
+    return parsePromptPrice(target.prompt and target.prompt.ObjectText)
+end
+
+local function wildPetPurchaseSucceeded(target, petName)
+    if petName and playerOwnsPet(petName) then return true end
+    if not target or not target.ref then return true end
+    if not target.ref.Parent then return true end
+    if target.ref:GetAttribute("OwnerUserId") == LocalPlayer.UserId then return true end
+    if target.prompt and not target.prompt.Enabled then return true end
+    return false
+end
+
+local function holdNearWildPet(target)
+    local HRP = getHRP()
+    local part = target and target.part
+    if not HRP or not part or not part.Parent then return false end
+    local maxDist = (target.prompt and target.prompt.MaxActivationDistance or 12) - 0.5
+    local goal = part.CFrame * CFrame.new(0, 0, 2)
+    HRP.AssemblyLinearVelocity = Vector3.zero
+    HRP.AssemblyAngularVelocity = Vector3.zero
+    HRP.CFrame = goal
+    local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if hum then hum:MoveTo(goal.Position) end
+    return (HRP.Position - part.Position).Magnitude <= maxDist + 1
 end
 
 local function triggerHoldPrompt(prompt)
@@ -1011,7 +1089,7 @@ local function findWildPetTargets(petFilter)
             if root and prompt and prompt.Enabled then
                 table.insert(targets, {
                     name = petName, part = root, prompt = prompt, ref = ref,
-                    price = parsePromptPrice(prompt.ObjectText),
+                    price = root:GetAttribute("Price"),
                 })
             end
         end
@@ -1062,23 +1140,65 @@ end
 
 local function tryBuyWildPet(target)
     if not target or not target.ref or not target.ref.Parent then return false, "missing" end
-    local price = target.price or parsePromptPrice(target.prompt and target.prompt.ObjectText)
+    if target.ref:GetAttribute("OwnerUserId") == LocalPlayer.UserId then return false, "owned" end
+    if not target.prompt or not target.prompt.Enabled then return false, "disabled" end
+
+    local petName = target.name
+    local failKey = tostring(target.ref)
+    if (PetHuntFails[failKey] or 0) >= 3 then return false, "blacklist" end
+
+    local price = getWildPetPrice(target)
     if price and getPlayerSheckles() < price then return false, "money" end
 
+    cancelMovement()
     TravelActive = true
-    local arrived = moveToPosition(target.part.Position, function() return KaitunRunning end)
-    TravelActive = false
-    if not arrived then return false, "move" end
 
-    if isLegitMovement() then
-        if not triggerHoldPrompt(target.prompt) then return false, "prompt" end
-    else
-        fireRemote("wildpet", function()
-            Net.Pets.WildPetTame:Fire(target.ref)
-        end, 2)
+    local arrived = moveToPosition(target.part.Position, function() return KaitunRunning end)
+    if not arrived then
+        TravelActive = false
+        return false, "move"
     end
-    task.wait(1.5)
-    return true
+
+    if not holdNearWildPet(target) then
+        TravelActive = false
+        return false, "too_far"
+    end
+
+    local tameKey = "wildpet_" .. failKey
+    if isLegitMovement() then
+        if not triggerHoldPrompt(target.prompt) then
+            TravelActive = false
+            PetHuntFails[failKey] = (PetHuntFails[failKey] or 0) + 1
+            return false, "prompt"
+        end
+    else
+        if not fireRemote(tameKey, function()
+            Net.Pets.WildPetTame:Fire(target.ref)
+        end, 0.35) then
+            pcall(function()
+                Net.Pets.WildPetTame:Fire(target.ref)
+            end)
+        end
+    end
+
+    local deadline = os.clock() + 3.5
+    while os.clock() < deadline and KaitunRunning do
+        if wildPetPurchaseSucceeded(target, petName) then
+            PetHuntFails[failKey] = nil
+            TravelActive = false
+            return true
+        end
+        holdNearWildPet(target)
+        task.wait(0.12)
+    end
+
+    TravelActive = false
+    PetHuntFails[failKey] = (PetHuntFails[failKey] or 0) + 1
+    if (PetHuntFails[failKey] or 0) >= 3 then
+        State.petHuntBackoffUntil = os.clock() + 20
+        log("Pet buy failed x3 — farm 20s then retry (" .. petName .. ")")
+    end
+    return false, "failed"
 end
 
 local function countOwnedPets()
@@ -1125,8 +1245,10 @@ local function huntFinderPetOnce()
             log("Bought wild pet: " .. target.name)
             return true
         elseif reason == "money" then
-            log("Need more Sheckles for " .. target.name)
+            log("Need more Sheckles for " .. target.name .. " (£" .. fmtMoney(getWildPetPrice(target) or 0) .. ")")
             return false
+        elseif reason == "blacklist" then
+            continue
         end
     end
     return false
@@ -1217,7 +1339,7 @@ local function tryAutoTutorialSendPet()
     if Config.AutoOpenEggs then
         tryOpenEgg()
         tryBuyEssentials()
-        tryBuyAllSeedsAffordable()
+        tryBuySeedsTiered()
     end
     return false
 end
@@ -1483,7 +1605,9 @@ local function classifyTool(tool)
     if tool:GetAttribute("Pet") or tool:GetAttribute("PetName") then return "Pets" end
     if tool:GetAttribute("Egg") then return "Eggs" end
     if tool:GetAttribute("Crate") then return "Crates" end
-    if tool:GetAttribute("HarvestedFruit") or tool:GetAttribute("Fruit") then return "Fruits" end
+    if tool:GetAttribute("HarvestedFruit") or tool:GetAttribute("Fruit") or tool:GetAttribute("FruitName") then
+        return "Fruits"
+    end
     if tool:GetAttribute("Sprinkler") or tool:GetAttribute("WateringCan")
         or tool:GetAttribute("Shovel") or tool:GetAttribute("Gear") then
         return "Gear"
@@ -1573,13 +1697,14 @@ local function buildDashboardText()
         onFlag("FFlags", PerfState.fflagsOn) .. "  |  " .. onFlag("LowGFX", PerfState.lowGfxOn) .. "  |  " .. onFlag("Hide3D", PerfState.hideGarden3D),
         "────────────────────────",
         "Phase: " .. State.phase .. "  |  " .. State.status,
-        "Farm: " .. State.farmPhase .. (State.farmPhase == "grow_wait" and (" (" .. getGrowWaitSeconds() .. "s)") or ""),
+        "Farm: " .. State.farmPhase .. (State.farmPhase == "grow" and (" (" .. getGrowWaitSeconds() .. "s)") or ""),
         "£" .. fmtMoney(getPlayerSheckles()) .. "  |  " .. getMovementMode() .. " mode",
         "Garden: " .. (garden and garden.Name or "—") .. "  |  Night: " .. tostring(NightVal.Value),
         "Pet: " .. activePet .. (ownsActive and " ✓" or " ✗")
             .. "  |  finder: " .. (isPetFinderEnabled() and "ON" or "OFF"),
         "────────────────────────",
-        "Inv  seed:" .. counts.Seeds .. "  pet:" .. counts.Pets .. "  egg:" .. counts.Eggs,
+        "Inv  fruit:" .. getFruitCount() .. "/" .. getMaxFruitCapacity()
+            .. "  seed:" .. counts.Seeds .. "  pet:" .. counts.Pets .. "  egg:" .. counts.Eggs,
         "     fruit:" .. counts.Fruits .. "  gear:" .. counts.Gear .. "  crate:" .. counts.Crates,
         "     total:" .. counts.Total,
         "World plants: " .. countWorldPlantsCached() .. "  hidden: " .. countHiddenParts(),
@@ -1769,47 +1894,64 @@ local function getGrowWaitSeconds()
     return math.max(0, math.ceil(State.nextHarvestAt - os.clock()))
 end
 
-local function runFarmStateMachine(garden)
-    local now = os.clock()
-
-    if State.farmPhase == "grow_wait" then
-        State.phase = "grow_wait"
-        local left = getGrowWaitSeconds()
-        State.status = "Growing... " .. left .. "s until harvest"
-        if now < State.nextHarvestAt then
-            return
-        end
-        State.farmPhase = "harvest_sell"
-    end
-
-    if State.farmPhase == "harvest_sell" then
-        State.phase = "harvest_sell"
-        log("Harvest + sell")
-        tryWater(garden)
-        tryHarvest(garden)
-        trySell()
-        tryPetManagement()
-        State.farmPhase = "buy_plant"
+local function runFarmCycle(garden)
+    if isInventoryFull() then
+        State.phase = "sell"
+        log("Inventory full — sell")
+        forceSell()
+        State.farmPhase = "buy"
         return
     end
 
-    -- buy_plant
-    State.phase = "buy_plant"
-    log("Buy seeds (cheap→expensive) + plant")
-    tryBuyEssentials()
-    tryBuyAllSeedsAffordable()
-    if Config.DeleteNonFarmPlants then
-        tryDeletePlants(garden)
+    if State.farmPhase == "buy" then
+        State.phase = "buy"
+        log("Buy seeds (stock, rẻ→đắt)")
+        tryBuyEssentials()
+        local n = tryBuySeedsTiered()
+        log("Bought x" .. n)
+        State.farmPhase = "plant"
+        return
     end
-    local n = tryPlantAllSeeds(garden)
-    tryWater(garden)
-    trySprinkler(garden)
-    State.farmPhase = "grow_wait"
-    State.nextHarvestAt = os.clock() + Config.HarvestCycleInterval
-    log("Planted x" .. n .. " — wait " .. Config.HarvestCycleInterval .. "s")
+
+    if State.farmPhase == "plant" then
+        State.phase = "plant"
+        log("Plant")
+        if Config.DeleteNonFarmPlants then tryDeletePlants(garden) end
+        local n = tryPlantAllSeeds(garden)
+        tryWater(garden)
+        trySprinkler(garden)
+        log("Planted x" .. n)
+        State.farmPhase = "grow"
+        State.nextHarvestAt = os.clock() + Config.HarvestCycleInterval
+        return
+    end
+
+    if State.farmPhase == "grow" then
+        State.phase = "grow"
+        State.status = "Growing " .. getGrowWaitSeconds() .. "s"
+        if os.clock() < State.nextHarvestAt then return end
+        State.farmPhase = "harvest"
+        return
+    end
+
+    if State.farmPhase == "harvest" then
+        State.phase = "harvest"
+        log("Harvest")
+        tryHarvest(garden)
+        State.farmPhase = "sell"
+        return
+    end
+
+    -- sell
+    State.phase = "sell"
+    log("Sell")
+    forceSell()
+    tryOpenEgg()
+    State.farmPhase = "buy"
 end
 
 log("Kaitun started | mode=" .. getMovementMode() .. " | finder=" .. table.concat(getPetFinderQueue(), ", "))
+State.farmPhase = (isInventoryFull() or getFruitCount() > 0) and "sell" or "buy"
 createKaitunUI()
 startFpsTracker()
 startUIUpdater()
@@ -1875,15 +2017,19 @@ while KaitunRunning do
         end
     end
 
-    if isPetFinderEnabled() and getActiveFinderPet() and not WorldSeedSnatcher.claiming then
+    if isPetFinderEnabled()
+        and getActiveFinderPet()
+        and getPlayerSheckles() >= getPetFinderHopMoney()
+        and not WorldSeedSnatcher.claiming then
         local petName = getActiveFinderPet()
-        local targets = findWildPetTargets(petName)
+        local inBackoff = State.petHuntBackoffUntil and os.clock() < State.petHuntBackoffUntil
+        local targets = inBackoff and {} or findWildPetTargets(petName)
         if #targets > 0 then
             State.phase = "pet_hunt"
             huntFinderPetOnce()
-            task.wait(1)
+            task.wait(0.5)
             continue
-        elseif shouldHopForPet() then
+        elseif not inBackoff and shouldHopForPet() then
             State.phase = "hop"
             hopServer()
             task.wait(8)
@@ -1892,7 +2038,7 @@ while KaitunRunning do
     end
 
     if garden then
-        runFarmStateMachine(garden)
+        runFarmCycle(garden)
     else
         State.phase = "waiting_garden"
         log("Waiting for garden...")
