@@ -1139,6 +1139,8 @@ end
 
 -- Forward declaration: sendWebhookEmbed được định nghĩa sau nhưng snatchWorldSeedTarget dùng trước
 local sendWebhookEmbed
+local saveSeedCountsToFile  -- định nghĩa sau, dùng trong snatchWorldSeedTarget
+local loadSeedCountsFromFile
 
 local function snatchWorldSeedTarget(target)
     if not target or WorldSeedSnatcher.claiming then return false end
@@ -1658,14 +1660,14 @@ local function markTutorialDoneInFile()
 end
 
 -- Persist gold/rainbow seed count qua re-execute (lưu chung Surge.json)
-local function loadSeedCountsFromFile()
+loadSeedCountsFromFile = function()
     local data = loadTutorialFile()
     local acc = data[getAccountKey()]
     if type(acc) ~= "table" then return 0, 0 end
     return tonumber(acc.goldSeedCollected) or 0, tonumber(acc.rainbowSeedCollected) or 0
 end
 
-local function saveSeedCountsToFile()
+saveSeedCountsToFile = function()
     local data = loadTutorialFile()
     local key = getAccountKey()
     if type(data[key]) ~= "table" then data[key] = {} end
