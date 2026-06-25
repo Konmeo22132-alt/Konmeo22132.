@@ -106,6 +106,10 @@ local DEFAULT_CONFIG = {
     },
 
     BuyGears = { "Common Sprinkler", "Common Watering Can" },
+    MaxBuysPerCycle = 20,
+    MaxBuysPerTick = 3,
+    PlantAttemptsPerTick = 8,
+    MaxInventoryTools = 83,
     HarvestCycleInterval = 30,
     PlantAttemptsPerCycle = 24,
     Sprinkler = "Common Sprinkler",
@@ -125,9 +129,9 @@ local DEFAULT_CONFIG = {
     WebhookInterval = 120,
     AntiAfk = true,
     StayInBase = true,
-    MainLoopDelay = 0.8,
+    MainLoopDelay = 0.25,
     RemoteCooldown = 0.12,
-    SellInterval = 1,
+    SellInterval = 5,
     ExpandInterval = 12,
     FpsCap = 30,
     LowGraphics = true,
@@ -289,8 +293,10 @@ local TravelActive = false
 local RemoteLastFire = {}
 local State = {
     phase = "init",
-    farmPhase = "buy",
     nextHarvestAt = 0,
+    lastHarvest = 0,
+    lastWater = 0,
+    lastExtras = 0,
     tutorialDone = false,
     lastHop = 0,
     lastSell = 0,
@@ -441,16 +447,35 @@ local function getMaxFruitCapacity()
     return tonumber(LocalPlayer:GetAttribute("MaxFruitCapacity")) or 100
 end
 
+local function getToolCount()
+    local n = 0
+    local function scan(container)
+        if not container then return end
+        for _, tool in container:GetChildren() do
+            if tool:IsA("Tool") then n += 1 end
+        end
+    end
+    scan(LocalPlayer.Backpack)
+    scan(LocalPlayer.Character)
+    return n
+end
+
+local function isBackpackFull()
+    return getToolCount() >= (Config.MaxInventoryTools or 83)
+end
+
 local function isInventoryFull()
     return getFruitCount() >= getMaxFruitCapacity()
 end
 
+local function shouldBlockBuy()
+    return isInventoryFull() or isBackpackFull()
+end
+
 local function forceSell()
-    if getFruitCount() <= 0 then return false end
     local ok = pcall(function()
         Net.NPCS.SellAll:Fire()
     end)
-    task.wait(0.25)
     return ok
 end
 
@@ -516,6 +541,17 @@ local function countMyPlants(garden, filterSet)
         if plant:GetAttribute("UserId") ~= LocalPlayer.UserId then continue end
         local seedName = plant:GetAttribute("SeedName")
         if not filterSet or plantNameInSet(seedName, filterSet) then n += 1 end
+    end
+    return n
+end
+
+local function countOccupiedStackSlots(garden)
+    local positions = getStackPositions(garden)
+    local n = 0
+    for _, pos in ipairs(positions) do
+        if isTooCloseToPlant(pos, garden, Config.StackSpacing * 0.6) then
+            n += 1
+        end
     end
     return n
 end
@@ -611,13 +647,15 @@ local function getSeedShopStock(seedName)
     return tonumber(label.Text:match("x(%d+)")) or 0
 end
 
-local function tryBuySeedsTiered()
+local function tryBuySeedsTiered(maxBuys)
     if not Config.BuySeed.Enable then return 0 end
+    maxBuys = maxBuys or Config.MaxBuysPerCycle or 20
     local bought = 0
     for _, entry in ipairs(ALL_SEEDS_BY_PRICE) do
+        if bought >= maxBuys then break end
         if not isSeedEnabled(Config.BuySeed, entry.name) then continue end
-        while KaitunRunning do
-            if isInventoryFull() then break end
+        while bought < maxBuys and KaitunRunning do
+            if shouldBlockBuy() then break end
             local stock = getSeedShopStock(entry.name)
             if stock <= 0 then break end
             if getPlayerSheckles() < entry.price then break end
@@ -631,11 +669,30 @@ local function tryBuySeedsTiered()
     return bought
 end
 
+local function findPlantPosition(garden)
+    for _, pos in ipairs(getStackPositions(garden)) do
+        if not isTooCloseToPlant(pos, garden, Config.StackSpacing * 0.6) then
+            return pos
+        end
+    end
+    for _, area in ipairs(getPlantAreas(garden)) do
+        local cf, size = area.CFrame, area.Size
+        local step = Config.StackSpacing
+        for x = -size.X / 2, size.X / 2 - step, step do
+            for z = -size.Z / 2, size.Z / 2 - step, step do
+                local pos = (cf * CFrame.new(x, size.Y / 2 + 0.5, z)).Position
+                if not isTooCloseToPlant(pos, garden, Config.StackSpacing * 0.6) then
+                    return pos
+                end
+            end
+        end
+    end
+end
+
 local function tryPlantOneSeed(garden)
     if not Config.PlantSeed.Enable then return false end
-    if countMyPlants(garden, nil) >= Config.StackMaxPlants then return false end
-    local positions = getStackPositions(garden)
-    if #positions == 0 then return false end
+    local pos = findPlantPosition(garden)
+    if not pos then return false end
 
     for _, entry in ipairs(ALL_SEEDS_BY_PRICE) do
         if not isSeedEnabled(Config.PlantSeed, entry.name) then continue end
@@ -643,14 +700,11 @@ local function tryPlantOneSeed(garden)
         if not seedTool then continue end
         seedTool = equipTool(seedTool)
         if not seedTool then continue end
-        for _, pos in ipairs(positions) do
-            if not isTooCloseToPlant(pos, garden, Config.StackSpacing * 0.6) then
-                fireRemote("plant", function()
-                    Net.Plant.PlantSeed:Fire(pos, entry.name, seedTool)
-                end, 0.08)
-                return true
-            end
-        end
+        pcall(function()
+            Net.Plant.PlantSeed:Fire(pos, entry.name, seedTool)
+        end)
+        task.wait(0.08)
+        return true
     end
     return false
 end
@@ -1697,7 +1751,10 @@ local function buildDashboardText()
         onFlag("FFlags", PerfState.fflagsOn) .. "  |  " .. onFlag("LowGFX", PerfState.lowGfxOn) .. "  |  " .. onFlag("Hide3D", PerfState.hideGarden3D),
         "────────────────────────",
         "Phase: " .. State.phase .. "  |  " .. State.status,
-        "Farm: " .. State.farmPhase .. (State.farmPhase == "grow" and (" (" .. getGrowWaitSeconds() .. "s)") or ""),
+        "Farm: continuous  |  sell every " .. (Config.SellInterval or 5) .. "s"
+            .. " (last " .. math.floor(os.clock() - (State.lastSell or 0)) .. "s)",
+        "Tools: " .. getToolCount() .. "/" .. (Config.MaxInventoryTools or 83)
+            .. "  |  harvest in " .. math.max(0, math.ceil((State.lastHarvest + Config.HarvestCycleInterval) - os.clock())) .. "s",
         "£" .. fmtMoney(getPlayerSheckles()) .. "  |  " .. getMovementMode() .. " mode",
         "Garden: " .. (garden and garden.Name or "—") .. "  |  Night: " .. tostring(NightVal.Value),
         "Pet: " .. activePet .. (ownsActive and " ✓" or " ✗")
@@ -1890,74 +1947,84 @@ end
 
 -- ── Main kaitun loop ────────────────────────────────────────────────────────
 
-local function getGrowWaitSeconds()
-    return math.max(0, math.ceil(State.nextHarvestAt - os.clock()))
+local function hasPlantableSeeds()
+    if not Config.PlantSeed.Enable then return false end
+    for _, entry in ipairs(ALL_SEEDS_BY_PRICE) do
+        if isSeedEnabled(Config.PlantSeed, entry.name) and findToolByAttribute("SeedTool", entry.name) then
+            return true
+        end
+    end
+    return false
 end
 
-local function runFarmCycle(garden)
-    if isInventoryFull() then
-        State.phase = "sell"
-        log("Inventory full — sell")
-        forceSell()
-        State.farmPhase = "buy"
-        return
+local function runFarmTick(garden)
+    local actions = {}
+
+    if hasPlantableSeeds() then
+        local planted = 0
+        for _ = 1, Config.PlantAttemptsPerTick or 8 do
+            if not tryPlantOneSeed(garden) then break end
+            planted += 1
+        end
+        if planted > 0 then
+            State.phase = "plant"
+            table.insert(actions, "plant x" .. planted)
+        end
     end
 
-    if State.farmPhase == "buy" then
-        State.phase = "buy"
-        log("Buy seeds (stock, rẻ→đắt)")
-        tryBuyEssentials()
-        local n = tryBuySeedsTiered()
-        log("Bought x" .. n)
-        State.farmPhase = "plant"
-        return
+    if not shouldBlockBuy() and Config.BuySeed.Enable then
+        local bought = tryBuySeedsTiered(Config.MaxBuysPerTick or 3)
+        if bought > 0 then
+            State.phase = "buy"
+            table.insert(actions, "buy x" .. bought)
+        end
     end
 
-    if State.farmPhase == "plant" then
-        State.phase = "plant"
-        log("Plant")
-        if Config.DeleteNonFarmPlants then tryDeletePlants(garden) end
-        local n = tryPlantAllSeeds(garden)
+    if os.clock() - State.lastHarvest >= Config.HarvestCycleInterval then
+        tryHarvest(garden)
+        State.lastHarvest = os.clock()
+        State.phase = "harvest"
+        table.insert(actions, "harvest")
+    end
+
+    if os.clock() - State.lastWater >= 45 then
         tryWater(garden)
         trySprinkler(garden)
-        log("Planted x" .. n)
-        State.farmPhase = "grow"
-        State.nextHarvestAt = os.clock() + Config.HarvestCycleInterval
-        return
+        State.lastWater = os.clock()
     end
 
-    if State.farmPhase == "grow" then
-        State.phase = "grow"
-        State.status = "Growing " .. getGrowWaitSeconds() .. "s"
-        if os.clock() < State.nextHarvestAt then return end
-        State.farmPhase = "harvest"
-        return
+    if os.clock() - (State.lastExtras or 0) >= 90 then
+        tryBuyEssentials()
+        if Config.AutoOpenEggs then tryOpenEgg() end
+        State.lastExtras = os.clock()
     end
 
-    if State.farmPhase == "harvest" then
-        State.phase = "harvest"
-        log("Harvest")
-        tryHarvest(garden)
-        State.farmPhase = "sell"
-        return
+    if Config.DeleteNonFarmPlants then
+        tryDeletePlants(garden)
     end
 
-    -- sell
-    State.phase = "sell"
-    log("Sell")
-    forceSell()
-    tryOpenEgg()
-    State.farmPhase = "buy"
+    State.status = #actions > 0 and table.concat(actions, " | ") or "farm loop"
+end
+
+local function startAutoSellLoop()
+    task.spawn(function()
+        while KaitunRunning do
+            forceSell()
+            State.lastSell = os.clock()
+            task.wait(Config.SellInterval or 5)
+        end
+    end)
 end
 
 log("Kaitun started | mode=" .. getMovementMode() .. " | finder=" .. table.concat(getPetFinderQueue(), ", "))
-State.farmPhase = (isInventoryFull() or getFruitCount() > 0) and "sell" or "buy"
+State.lastHarvest = os.clock()
 createKaitunUI()
 startFpsTracker()
 startUIUpdater()
 applyOptimizations()
 startAntiAfk()
 startWorldSeedSnatcher()
+startAutoSellLoop()
 sendWebhook("Kaitun started — " .. LocalPlayer.Name .. " | £" .. tostring(getPlayerSheckles()))
 
 task.spawn(function()
@@ -2038,7 +2105,7 @@ while KaitunRunning do
     end
 
     if garden then
-        runFarmCycle(garden)
+        runFarmTick(garden)
     else
         State.phase = "waiting_garden"
         log("Waiting for garden...")
