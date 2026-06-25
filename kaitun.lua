@@ -1137,6 +1137,9 @@ local function touchPartWithCharacter(part, goal)
     end
 end
 
+-- Forward declaration: sendWebhookEmbed được định nghĩa sau nhưng snatchWorldSeedTarget dùng trước
+local sendWebhookEmbed
+
 local function snatchWorldSeedTarget(target)
     if not target or WorldSeedSnatcher.claiming then return false end
     WorldSeedSnatcher.claiming = true
@@ -1921,7 +1924,7 @@ local function sendWebhook(msg)
 end
 
 -- Gửi webhook dạng embed (không ping ai). fields: { {name=.., value=.., inline=..}, ... }
-local function sendWebhookEmbed(title, description, color, fields)
+sendWebhookEmbed = function(title, description, color, fields)
     if Config.WebhookUrl == "" or not Config.WebhookUrl:find("discord") then return end
     pcall(function()
         local req = (syn and syn.request) or (http and http.request) or request
