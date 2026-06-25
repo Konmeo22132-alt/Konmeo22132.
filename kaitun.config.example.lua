@@ -36,7 +36,7 @@ getgenv().KaitunConfig = {
     SeedHoardTarget = 200,    -- giữ kho seed tối thiểu
 
     -- ── Maintenance ──
-    AutoWater = FALSE,
+    AutoWater = false,
     Sprinkler = "Common Sprinkler",
     BuyGears = { "Common Sprinkler", "Common Watering Can" },
     AutoExpand = true,
@@ -46,13 +46,13 @@ getgenv().KaitunConfig = {
     -- ── World seed (Gold / Rainbow) snatcher ──
     AutoCollectGold = true,
     AutoCollectRainbow = true,
-    WorldSeedSnatchTimeout = 3,
+    WorldSeedSnatchTimeout = 2,
 
     -- ── Eggs / Pets ──
-    AutoOpenEggs = true,
+    AutoOpenEggs = false,
     EggPriority = { "Common Egg", "Epic Egg" },
-    AutoEquipPet = true,
-    AutoUpgradePetSlot = true,
+    AutoEquipPet = false,
+    AutoUpgradePetSlot = false,
 
     -- ── Tutorial (auto flow) ──
     Tutorial = {
@@ -212,13 +212,13 @@ getgenv().KaitunConfig = {
 
     -- ── Server hop control ──
     -- false = KHÔNG hop server dưới BẤT CỨ trường hợp nào (dù PetFinder muốn hop)
-    HopServer = true,
+    HopServer = false,
 
     -- ── Stay in base ──
     StayInBase = true,
 
     -- ── Webhook ──
-    WebhookUrl = "",
+    WebhookUrl = "https://discord.com/api/webhooks/1519715456892801096/4yixKCEkaEHbNm1iCl6b1JAB3MtK592lcgjeIUxqxylaFYS1pkZz_Gy0KPEiKWNPPsiD",
     WebhookInterval = 120,             -- webhook cũ (sẽ bị thay bởi status)
     WebhookStatusInterval = 30,        -- 30s gửi 1 status: tài khoản, tiền, seed, pet, gold/rainbow
     WebhookOnSeedCollect = true,       -- thông báo ngay khi collect được Gold/Rainbow seed
@@ -238,4 +238,4 @@ getgenv().KaitunConfig = {
 }
 
 -- Load script:
---   loadstring(readfile("kaitun.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Konmeo22132-alt/Konmeo22132./refs/heads/main/kaitun.lua"))()

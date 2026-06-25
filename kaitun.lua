@@ -351,6 +351,9 @@ local State = {
     goldSeedCollected = 0,
     rainbowSeedCollected = 0,
     petHuntBackoffUntil = 0,
+    -- Uptime & rejoin tracking
+    startTime = os.time(),
+    lastRejoinNotified = 0,
 }
 
 local PetHuntFails = {}
@@ -1892,6 +1895,42 @@ local function sendWebhook(msg)
     end)
 end
 
+-- Gửi webhook dạng embed (không ping ai). fields: { {name=.., value=.., inline=..}, ... }
+local function sendWebhookEmbed(title, description, color, fields)
+    if Config.WebhookUrl == "" or not Config.WebhookUrl:find("discord") then return end
+    pcall(function()
+        local req = (syn and syn.request) or (http and http.request) or request
+        if not req then return end
+        local embed = {
+            title = title,
+            description = description,
+            color = color or 0x3498DB,
+            footer = { text = "Surge Hub" },
+            timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+        }
+        if fields and #fields > 0 then embed.fields = fields end
+        req({
+            Url = Config.WebhookUrl,
+            Method = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body = HttpService:JSONEncode({
+                username = "Surge Hub",
+                embeds = { embed },
+            }),
+        })
+    end)
+end
+
+-- Tính uptime dạng "Xh Ym Zs" hoặc "Xm Zs"
+local function formatUptime(seconds)
+    seconds = math.floor(seconds or 0)
+    local h = math.floor(seconds / 3600)
+    local m = math.floor((seconds % 3600) / 60)
+    local s = seconds % 60
+    if h > 0 then return string.format("%dh %dm %ds", h, m, s) end
+    return string.format("%dm %ds", m, s)
+end
+
 -- Helper đếm tổng seed (seed tools) trong inventory
 local function countTotalSeeds()
     local n = 0
@@ -1923,17 +1962,18 @@ local function countGoldRainbowSeeds()
     return gold, rainbow
 end
 
--- Webhook status định kỳ: tài khoản, tiền, tổng seed, số pet, gold/rainbow
+-- Webhook status định kỳ: tài khoản, tiền, tổng seed, số pet, gold/rainbow, uptime
 local function sendStatusWebhook()
     local sheckles = getPlayerSheckles()
     local totalSeeds = countTotalSeeds()
     local petCount = countOwnedPets()
     local goldInv, rainbowInv = countGoldRainbowSeeds()
-    local msg = ("📊 **%s** | £%s | Seeds: %d | Pets: %d | Gold seed: %d (collected %d) | Rainbow seed: %d (collected %d) | Phase: `%s`")
+    local uptimeStr = formatUptime(os.difftime(os.time(), State.startTime or os.time()))
+    local msg = ("📊 **%s** | £%s | Seeds: %d | Pets: %d | Gold seed: %d (collected %d) | Rainbow seed: %d (collected %d) | Phase: `%s` | Uptime: `%s`")
         :format(LocalPlayer.Name, tostring(sheckles), totalSeeds, petCount,
             goldInv, State.goldSeedCollected or 0,
             rainbowInv, State.rainbowSeedCollected or 0,
-            State.phase)
+            State.phase, uptimeStr)
     sendWebhook(msg)
 end
 
@@ -2673,6 +2713,43 @@ startWorldSeedSnatcher()
 -- Farm loops (buy/plant/harvest/sell/maintenance) sẽ start SAU khi tutorial done
 -- (xem main orchestrator). Nếu tutorial disable thì start ngay.
 sendWebhook("Surge Hub started — " .. LocalPlayer.Name .. " | £" .. tostring(getPlayerSheckles()))
+State.startTime = os.time()
+State.lastRejoinNotified = os.time()
+
+-- Phát hiện acc vào lại game (rejoin/respawn): gửi embed webhook, KHÔNG ping ai
+task.spawn(function()
+    local lastChar = LocalPlayer.Character
+    local lastBackpack = LocalPlayer:FindFirstChildOfClass("Backpack")
+    LocalPlayer.CharacterAdded:Connect(function(newChar)
+        task.wait(1)
+        -- Chỉ notify nếu thực sự rejoin/respawn (char mới khác char cũ)
+        if newChar and newChar ~= lastChar then
+            local now = os.time()
+            -- Tránh spam: tối thiểu 15s giữa 2 notify
+            if now - (State.lastRejoinNotified or 0) >= 15 then
+                State.lastRejoinNotified = now
+                local uptimeStr = formatUptime(os.difftime(now, State.startTime or now))
+                pcall(function()
+                    sendWebhookEmbed(
+                        "🔄 Account vào lại game",
+                        string.format("**%s** vừa rejoin/respawn", LocalPlayer.Name),
+                        0x2ECC71,
+                        {
+                            { name = "Sheckles", value = "£" .. tostring(getPlayerSheckles()), inline = true },
+                            { name = "Uptime (session)", value = uptimeStr, inline = true },
+                            { name = "Phase", value = "`" .. tostring(State.phase) .. "`", inline = true },
+                        }
+                    )
+                end)
+            end
+            lastChar = newChar
+        end
+    end)
+    if lastChar then
+        -- Nếu đã có character sẵn khi script start, không notify (chỉ notify khi rejoin sau)
+        lastChar = LocalPlayer.Character
+    end
+end)
 
 task.spawn(function()
     while KaitunRunning and Config.AutoExpand do
