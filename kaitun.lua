@@ -1295,6 +1295,28 @@ local function touchPartWithCharacter(part, goal)
     end
 end
 
+-- Fire ProximityPrompt "CLAIM" trên world seed (gold/rainbow collect bằng prompt, KHÔNG phải touch).
+-- Tìm prompt trên part hoặc model cha, fire qua fireproximityprompt (bypass line-of-sight).
+local function fireWorldSeedPrompt(part)
+    if not part or not part.Parent then return false end
+    local prompt = part:FindFirstChildWhichIsA("ProximityPrompt", true)
+    if not prompt and part.Parent then
+        prompt = part.Parent:FindFirstChildWhichIsA("ProximityPrompt", true)
+    end
+    if not prompt or not prompt.Enabled then return false end
+    local hold = (prompt.HoldDuration and prompt.HoldDuration > 0) and prompt.HoldDuration or 0
+    pcall(function()
+        if fireproximityprompt then
+            fireproximityprompt(prompt, hold)
+        else
+            prompt:InputHoldBegin()
+            if hold > 0 then task.wait(hold) end
+            prompt:InputHoldEnd()
+        end
+    end)
+    return true
+end
+
 -- Forward declaration: sendWebhookEmbed được định nghĩa sau nhưng snatchWorldSeedTarget dùng trước
 local sendWebhookEmbed
 local saveSeedCountsToFile  -- định nghĩa sau, dùng trong snatchWorldSeedTarget
@@ -1310,6 +1332,7 @@ local function snatchWorldSeedTarget(target)
 
     local deadline = os.clock() + (Config.WorldSeedSnatchTimeout or 3)
     local got = false
+    local promptLogged = false
 
     while os.clock() < deadline and KaitunRunning do
         local part = target.part
@@ -1321,6 +1344,12 @@ local function snatchWorldSeedTarget(target)
         local pos = part:IsA("BasePart") and part.Position or part:GetPivot().Position
         local goal = pos + Vector3.new(0, 2, 0)
         touchPartWithCharacter(part, goal)
+        -- Collect thật qua ProximityPrompt CLAIM (touch chỉ là fallback)
+        local firedPrompt = fireWorldSeedPrompt(part)
+        if not promptLogged then
+            promptLogged = true
+            log("SNATCH " .. target.name .. " — prompt=" .. tostring(firedPrompt))
+        end
 
         if not part.Parent then
             got = true
