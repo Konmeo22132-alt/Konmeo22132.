@@ -2185,6 +2185,7 @@ local function hideVisualInstance(inst)
                 CastShadow = inst.CastShadow,
                 LocalTransparencyModifier = inst.LocalTransparencyModifier,
             }
+            PerfState.hiddenCount = (PerfState.hiddenCount or 0) + 1
         end
         inst.LocalTransparencyModifier = 1
         inst.Transparency = 1
@@ -2194,16 +2195,19 @@ local function hideVisualInstance(inst)
     elseif inst:IsA("Decal") or inst:IsA("Texture") then
         if not PerfState.hiddenParts[inst] then
             PerfState.hiddenParts[inst] = { Transparency = inst.Transparency }
+            PerfState.hiddenCount = (PerfState.hiddenCount or 0) + 1
         end
         inst.Transparency = 1
     elseif inst:IsA("ParticleEmitter") or inst:IsA("Trail") or inst:IsA("Beam") then
         if not PerfState.hiddenParts[inst] then
             PerfState.hiddenParts[inst] = { Enabled = inst.Enabled }
+            PerfState.hiddenCount = (PerfState.hiddenCount or 0) + 1
         end
         inst.Enabled = false
     elseif inst:IsA("BillboardGui") or inst:IsA("SurfaceGui") then
         if not PerfState.hiddenParts[inst] then
             PerfState.hiddenParts[inst] = { Enabled = inst.Enabled }
+            PerfState.hiddenCount = (PerfState.hiddenCount or 0) + 1
         end
         inst.Enabled = false
     end
@@ -2231,8 +2235,15 @@ local function sweepHideAllGardenPlants()
     for _, garden in Gardens:GetChildren() do
         local plants = garden:FindFirstChild("Plants")
         if plants then
-            for _, desc in plants:GetDescendants() do
-                hideVisualInstance(desc)
+            -- Chỉ iterate plants (chứ không phải descendants) — giảm 138k → ~1.4k
+            for _, plant in ipairs(plants:GetChildren()) do
+                -- Skip plant đã hide (đã có flag) → tránh lặp lại work
+                if not plant:GetAttribute("SurgeHidden") then
+                    for _, desc in plant:GetDescendants() do
+                        hideVisualInstance(desc)
+                    end
+                    plant:SetAttribute("SurgeHidden", true)
+                end
             end
         end
         local visual = garden:FindFirstChild("Visual")
@@ -2258,7 +2269,7 @@ local function enableHideGarden3D()
     if PerfState.hideSweepTask then task.cancel(PerfState.hideSweepTask) end
     PerfState.hideSweepTask = task.spawn(function()
         while PerfState.hideGarden3D and KaitunRunning do
-            task.wait(3)
+            task.wait(15)  -- 3s -> 15s: giảm overhead, chỉ catch plant mới
             if PerfState.hideGarden3D then sweepHideAllGardenPlants() end
         end
     end)
@@ -2396,9 +2407,7 @@ local function countWorldPlantsCached()
 end
 
 local function countHiddenParts()
-    local n = 0
-    for _ in pairs(PerfState.hiddenParts) do n += 1 end
-    return n
+    return PerfState.hiddenCount or 0
 end
 
 local function onFlag(label, active)
