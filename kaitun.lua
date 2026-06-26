@@ -140,6 +140,10 @@ local DEFAULT_CONFIG = {
     SeedHoardTarget = 200,
     QuickProfitMode = false,       -- Chỉ mua seed rẻ (ROI nhanh cho short-term profit)
     QuickProfitMaxPrice = 1000,    -- Giá seed tối đa khi QuickProfitMode = true
+    -- Bamboo Farm Mode: chỉ buy + plant Bamboo (single-harvest, grow nhanh, kiếm tiền nhanh)
+    -- Khi true: override BuySeed/PlantSeed chỉ enable Bamboo, tăng tốc cycle
+    BambooFarmMode = false,
+    BambooFarmInterval = 0.5,      -- giây giữa mỗi cycle plant-harvest-sell khi BambooFarmMode
     DeleteNonFarmPlants = false,
     AutoExpand = true,
     AutoCollectGold = true,
@@ -228,6 +232,27 @@ local function normalizePetFinderConfig()
     end
 end
 normalizePetFinderConfig()
+
+-- Bamboo Farm Mode: override BuySeed/PlantSeed chỉ enable Bamboo (single-harvest crop, grow nhanh)
+local function normalizeBambooFarmConfig()
+    if not Config.BambooFarmMode then return end
+    -- Build seed map chỉ enable Bamboo
+    local bambooOnly = {}
+    for _, entry in ipairs(SEED_CATALOG) do
+        bambooOnly[entry.name] = (entry.name == "Bamboo")
+    end
+    bambooOnly.Gold = false
+    bambooOnly.Rainbow = false
+    -- Override buy + plant seed list
+    if type(Config.BuySeed) ~= "table" then Config.BuySeed = { Enable = true } end
+    Config.BuySeed.Enable = true
+    Config.BuySeed.Seed = bambooOnly
+    if type(Config.PlantSeed) ~= "table" then Config.PlantSeed = { Enable = true } end
+    Config.PlantSeed.Enable = true
+    Config.PlantSeed.Seed = bambooOnly
+    log("BambooFarmMode ON — chỉ buy/plant Bamboo")
+end
+normalizeBambooFarmConfig()
 
 local ALL_SEEDS_BY_PRICE = SEED_CATALOG
 local PetNames = PET_CATALOG
@@ -2426,7 +2451,8 @@ local function buildDashboardText()
     local sinceSell = math.floor(now - (State.lastSell or 0))
     return table.concat({
         "FPS " .. PerfState.currentFps .. "  |  cap " .. Config.FpsCap,
-        onFlag("FFlags", PerfState.fflagsOn) .. "  |  " .. onFlag("LowGFX", PerfState.lowGfxOn) .. "  |  " .. onFlag("Hide3D", PerfState.hideGarden3D),
+        onFlag("FFlags", PerfState.fflagsOn) .. "  |  " .. onFlag("LowGFX", PerfState.lowGfxOn) .. "  |  " .. onFlag("Hide3D", PerfState.hideGarden3D)
+            .. (Config.BambooFarmMode and "  |  🎋Bamboo" or ""),
         "────────────────────────",
         "Phase: " .. State.phase .. (State.tutorialPhase and State.tutorialPhase ~= "" and (" [" .. State.tutorialPhase .. "]") or ""),
         "Buy " .. sinceBuy .. "s | Plant " .. sincePlant .. "s | Harv " .. sinceHarvest .. "s",
