@@ -894,13 +894,13 @@ local function tryBuySeedsTiered(maxBuys)
         ownedQty = countSeedQuantitiesByName()
     end
     local bought = 0
-    local ranOutOfMoney = false
+    local sawUnaffordable = false   -- có seed còn stock nhưng không đủ tiền (đã skip sang rẻ hơn)
     local totalAvailableStock = 0   -- tổng stock tất cả seed enabled
-    -- Duyệt ĐẮT → RẺ: ưu tiên seed giá trị cao, tránh tràn seed rác rẻ
+    -- Duyệt ĐẮT → RẺ: ưu tiên seed giá trị cao. Không đủ tiền 1 loại → BỎ QUA sang loại
+    -- rẻ hơn (KHÔNG dừng hẳn) — nếu không vẫn mua được seed rẻ (Carrot) khi ít tiền.
     local catalog = ALL_SEEDS_BY_PRICE_DESC
     for _, entry in ipairs(catalog) do
         if bought >= maxBuys then break end
-        if ranOutOfMoney then break end
         if not isSeedEnabled(Config.BuySeed, entry.name) then continue end
         -- QuickProfitMode: chỉ mua seed rẻ để tối ưu short-term profit
         if Config.QuickProfitMode and entry.price > (Config.QuickProfitMaxPrice or 1000) then
@@ -922,6 +922,11 @@ local function tryBuySeedsTiered(maxBuys)
         if stock == nil then continue end
         if stock <= 0 then continue end
         totalAvailableStock += stock
+        -- Không đủ tiền mua loại này → thử loại RẺ HƠN tiếp theo (không dừng)
+        if getPlayerSheckles() < entry.price then
+            sawUnaffordable = true
+            continue
+        end
         -- Limit mỗi loại: không mua quá perTypeLimit seed của 1 loại trong 1 tick
         local typeBudget = stock
         if perTypeLimit and perTypeLimit > 0 then
@@ -935,8 +940,8 @@ local function tryBuySeedsTiered(maxBuys)
             -- Check tiền thực tế mỗi lần (sheckles có thể giảm do plant/harvest khác)
             local currentSheckles = getPlayerSheckles()
             if currentSheckles < entry.price then
-                ranOutOfMoney = true
-                break
+                sawUnaffordable = true
+                break   -- hết tiền cho loại này → sang loại rẻ hơn ở vòng ngoài
             end
             pcall(function()
                 Net.SeedShop.PurchaseSeed:Fire(entry.name)
@@ -950,14 +955,14 @@ local function tryBuySeedsTiered(maxBuys)
     -- Backoff khi không mua được gì — phân biệt lý do
     if bought == 0 then
         local backoff = Config.BuyBackoffSec or 5
-        if ranOutOfMoney then
-            BuyBackoff.reason = "out_of_money"
-            -- Hết tiền: backoff dài hơn (10s) để chờ earn tiền từ sell
-            backoff = 10
-        elseif totalAvailableStock == 0 then
+        if totalAvailableStock == 0 then
             BuyBackoff.reason = "no_stock"
             -- Hết stock: backoff 15s (restock thường vài chục giây) — tránh spam log
             backoff = 15
+        elseif sawUnaffordable then
+            BuyBackoff.reason = "out_of_money"
+            -- Hết tiền cho mọi seed còn stock: backoff 10s chờ earn từ sell
+            backoff = 10
         else
             BuyBackoff.reason = "unknown"
         end
