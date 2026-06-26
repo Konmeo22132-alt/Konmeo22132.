@@ -725,11 +725,13 @@ local function tryHarvest(garden)
     if not folder then return 0 end
     local harvested = 0
     local myUid = LocalPlayer.UserId
-    for _, plant in folder:GetChildren() do
+    local plantCount = 0
+    for _, plant in ipairs(folder:GetChildren()) do
+        plantCount += 1
         if not KaitunRunning then break end
         local fruitsFolder = plant:FindFirstChild("Fruits")
         if fruitsFolder then
-            for _, fruit in fruitsFolder:GetChildren() do
+            for _, fruit in ipairs(fruitsFolder:GetChildren()) do
                 if fruit:GetAttribute("UserId") == myUid then
                     local plantId = fruit:GetAttribute("PlantId")
                     local fruitId = fruit:GetAttribute("FruitId")
@@ -749,6 +751,9 @@ local function tryHarvest(garden)
                 task.wait(0.08)
             end
         end
+    end
+    if harvested == 0 and plantCount > 0 then
+        log("DEBUG tryHarvest: 0 harvested from " .. plantCount .. " plants")
     end
     return harvested
 end
