@@ -157,9 +157,11 @@ local DEFAULT_CONFIG = {
     -- false = tôn trọng tuyệt đối LimitPlantSeed (có thể để slot trống).
     FillGardenMode = true,
     StackSpacing = 1.2,
-    -- Số cây tối đa script cố nhét vào vườn (top1 chạy 300-400+). Tăng từ 64 → 200 để
-    -- scale throughput. Tự giảm nếu placement fail (vườn nhỏ). Tune theo plot expansion.
-    StackMaxPlants = 200,
+    -- QUAN TRỌNG: lưới stack là hình vuông side=ceil(sqrt(max)) * StackSpacing, PHẢI nhỏ hơn
+    -- bề rộng PlantArea (vd vườn 16 studs → side*1.2 < 16 → max ≤ ~144). Nếu lớn hơn, vị trí
+    -- trồng văng RA NGOÀI đất → server từ chối → KHÔNG ra cây. 64 = an toàn (cụm sát tâm ±4.8).
+    -- Sau khi 64 slot đầy, findPlantPosition tự quét tiếp diện tích đất thật để fill thêm.
+    StackMaxPlants = 64,
     BuyLoopInterval = 1,
     PlantLoopInterval = 0.05,
     HarvestLoopInterval = 0.1,
