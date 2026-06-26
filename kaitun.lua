@@ -141,6 +141,9 @@ local DEFAULT_CONFIG = {
     -- Giới hạn số seed tối đa mua MỖI LOẠI trong 1 tick (tránh tràn seed rác rẻ như Carrot/Tulip).
     -- Mua theo thứ tự ĐẮT → RẺ nên seed giá trị cao được mua trước, seed rẻ chỉ fill phần còn lại.
     MaxBuysPerSeedType = 3,
+    -- Trần kho seed = LimitPlantSeed * multiplier. VD Carrot limit 10, mult 2 → giữ tối đa 20 carrot,
+    -- không mua hết shop. Chỉ áp dụng cho seed có trong LimitPlantSeed.
+    BuySeedLimitMultiplier = 2,
     PlantAttemptsPerTick = 32,
     MaxInventoryTools = 83,
     HarvestInterval = 1,
@@ -570,6 +573,26 @@ local function countSeedToolTotal()
     return n
 end
 
+-- Đếm SỐ LƯỢNG seed theo từng loại (seed stack vào 1 Tool với attribute Count).
+-- Trả về map { [seedName] = quantity }. Dùng để limit mua (không vượt 2x plant limit).
+local function countSeedQuantitiesByName()
+    local q = {}
+    local function scan(container)
+        if not container then return end
+        for _, tool in container:GetChildren() do
+            if tool:IsA("Tool") then
+                local sn = tool:GetAttribute("SeedTool")
+                if sn then
+                    q[sn] = (q[sn] or 0) + (tool:GetAttribute("Count") or 1)
+                end
+            end
+        end
+    end
+    scan(LocalPlayer.Backpack)
+    scan(LocalPlayer.Character)
+    return q
+end
+
 local function getPlantableSeedList()
     local tools = getSeedToolsMap()
     local out = {}
@@ -863,6 +886,13 @@ local function tryBuySeedsTiered(maxBuys)
     end
     maxBuys = maxBuys or Config.MaxBuysPerCycle or 50
     local perTypeLimit = Config.MaxBuysPerSeedType or 0   -- 0 = không limit (cũ)
+    -- Hệ số trần kho seed = plant limit * multiplier (VD limit 10 → tối đa giữ 20 seed)
+    local buyMult = Config.BuySeedLimitMultiplier or 2
+    -- Đếm số lượng seed đang có (theo Count) 1 lần/tick để áp trần kho
+    local ownedQty = nil
+    if type(Config.LimitPlantSeed) == "table" then
+        ownedQty = countSeedQuantitiesByName()
+    end
     local bought = 0
     local ranOutOfMoney = false
     local totalAvailableStock = 0   -- tổng stock tất cả seed enabled
@@ -876,6 +906,17 @@ local function tryBuySeedsTiered(maxBuys)
         if Config.QuickProfitMode and entry.price > (Config.QuickProfitMaxPrice or 1000) then
             continue
         end
+        -- Trần kho theo plant limit: nếu đã giữ đủ limit*multiplier thì không mua thêm
+        local stockCap = nil
+        if ownedQty then
+            local plim = getPlantLimit(entry.name)
+            if plim then
+                local cap = plim * buyMult
+                local have = ownedQty[entry.name] or 0
+                stockCap = cap - have
+                if stockCap <= 0 then continue end   -- đã đủ kho, skip
+            end
+        end
         -- Đọc stock 1 lần đầu — nếu nil (GUI chưa load) hoặc 0 thì skip
         local stock = getSeedShopStock(entry.name)
         if stock == nil then continue end
@@ -886,6 +927,7 @@ local function tryBuySeedsTiered(maxBuys)
         if perTypeLimit and perTypeLimit > 0 then
             typeBudget = math.min(stock, perTypeLimit)
         end
+        if stockCap then typeBudget = math.min(typeBudget, stockCap) end
         local maxAttempts = math.min(typeBudget, maxBuys - bought)
         local attempts = 0
         while attempts < maxAttempts and KaitunRunning do
@@ -901,6 +943,7 @@ local function tryBuySeedsTiered(maxBuys)
             end)
             bought += 1
             attempts += 1
+            if ownedQty then ownedQty[entry.name] = (ownedQty[entry.name] or 0) + 1 end
             task.wait(0.05)
         end
     end
