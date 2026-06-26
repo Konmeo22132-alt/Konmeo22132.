@@ -92,6 +92,21 @@ local DEFAULT_CONFIG = {
         }),
     },
 
+    -- LimitPlantSeed: số cây tối đa MỖI LOẠI trong vườn cùng lúc.
+    -- VD Bamboo=150 → trồng tối đa 150 cây tre; harvest 1 cây xong trồng bù để luôn đủ 150.
+    -- Seed rẻ (Carrot/Tulip…) để thấp tránh tràn seed rác; seed giá trị cao để cao hơn.
+    -- Bỏ 1 key đi = loại đó KHÔNG bị giới hạn (trồng thoải mái).
+    LimitPlantSeed = {
+        ["Carrot"] = 4, ["Strawberry"] = 4, ["Blueberry"] = 4, ["Tulip"] = 4,
+        ["Tomato"] = 4, ["Apple"] = 4, ["Corn"] = 4, ["Cactus"] = 4, ["Pineapple"] = 4,
+        ["Bamboo"] = 150,
+        ["Mushroom"] = 200, ["Green Bean"] = 200,
+        ["Banana"] = 50, ["Grape"] = 50, ["Coconut"] = 50, ["Dragon Fruit"] = 50,
+        ["Mango"] = 50, ["Acorn"] = 50, ["Cherry"] = 50, ["Sunflower"] = 50,
+        ["Venus Fly Trap"] = 50, ["Pomegranate"] = 50, ["Poison Apple"] = 50,
+        ["Venom Spitter"] = 50, ["Moon Bloom"] = 50, ["Dragon's Breath"] = 50,
+    },
+
     GiftMail = {
         Enable = false,
         RecipientUserId = "",
@@ -123,6 +138,9 @@ local DEFAULT_CONFIG = {
     BuyGears = { "Common Sprinkler", "Common Watering Can" },
     MaxBuysPerCycle = 50,
     MaxBuysPerTick = 25,
+    -- Giới hạn số seed tối đa mua MỖI LOẠI trong 1 tick (tránh tràn seed rác rẻ như Carrot/Tulip).
+    -- Mua theo thứ tự ĐẮT → RẺ nên seed giá trị cao được mua trước, seed rẻ chỉ fill phần còn lại.
+    MaxBuysPerSeedType = 3,
     PlantAttemptsPerTick = 32,
     MaxInventoryTools = 83,
     HarvestInterval = 1,
@@ -256,6 +274,14 @@ normalizeBambooFarmConfig()
 
 local ALL_SEEDS_BY_PRICE = SEED_CATALOG
 local PetNames = PET_CATALOG
+
+-- Thứ tự đắt→rẻ: ưu tiên seed giá trị cao khi buy/plant (tránh tràn seed rác rẻ)
+local ALL_SEEDS_BY_PRICE_DESC = (function()
+    local copy = {}
+    for _, entry in ipairs(SEED_CATALOG) do table.insert(copy, entry) end
+    table.sort(copy, function(a, b) return (a.price or 0) > (b.price or 0) end)
+    return copy
+end)()
 
 local function isSeedEnabled(section, seedName)
     if type(section) ~= "table" or section.Enable ~= true then return false end
@@ -547,7 +573,7 @@ end
 local function getPlantableSeedList()
     local tools = getSeedToolsMap()
     local out = {}
-    for _, entry in ipairs(ALL_SEEDS_BY_PRICE) do
+    for _, entry in ipairs(ALL_SEEDS_BY_PRICE_DESC) do
         if isSeedEnabled(Config.PlantSeed, entry.name) and tools[entry.name] then
             table.insert(out, entry)
         end
@@ -694,6 +720,31 @@ local function countMyPlants(garden, filterSet)
     return n
 end
 
+-- LimitPlantSeed: số cây tối đa MỖI LOẠI được giữ trong vườn cùng lúc.
+-- VD Bamboo=150 → giữ tối đa 150 cây tre; harvest 1 cây (biến mất) → trồng bù để luôn đủ 150.
+-- Trả về nil nếu không cấu hình limit cho seed đó (= không giới hạn).
+local function getPlantLimit(seedName)
+    local lim = Config.LimitPlantSeed
+    if type(lim) ~= "table" then return nil end
+    local v = lim[seedName]
+    if type(v) == "number" and v > 0 then return v end
+    return nil
+end
+
+-- Đếm số cây của mình theo từng SeedName (1 lần quét, dùng cho LimitPlantSeed)
+local function countPlantsBySeedName(garden)
+    local counts = {}
+    local folder = garden and garden:FindFirstChild("Plants")
+    if not folder then return counts end
+    local myUid = LocalPlayer.UserId
+    for _, plant in folder:GetChildren() do
+        if plant:GetAttribute("UserId") ~= myUid then continue end
+        local sn = plant:GetAttribute("SeedName")
+        if sn then counts[sn] = (counts[sn] or 0) + 1 end
+    end
+    return counts
+end
+
 local function countOccupiedStackSlots(garden)
     local positions = getStackPositions(garden)
     local n = 0
@@ -811,10 +862,13 @@ local function tryBuySeedsTiered(maxBuys)
         return 0
     end
     maxBuys = maxBuys or Config.MaxBuysPerCycle or 50
+    local perTypeLimit = Config.MaxBuysPerSeedType or 0   -- 0 = không limit (cũ)
     local bought = 0
     local ranOutOfMoney = false
     local totalAvailableStock = 0   -- tổng stock tất cả seed enabled
-    for _, entry in ipairs(ALL_SEEDS_BY_PRICE) do
+    -- Duyệt ĐẮT → RẺ: ưu tiên seed giá trị cao, tránh tràn seed rác rẻ
+    local catalog = ALL_SEEDS_BY_PRICE_DESC
+    for _, entry in ipairs(catalog) do
         if bought >= maxBuys then break end
         if ranOutOfMoney then break end
         if not isSeedEnabled(Config.BuySeed, entry.name) then continue end
@@ -827,7 +881,12 @@ local function tryBuySeedsTiered(maxBuys)
         if stock == nil then continue end
         if stock <= 0 then continue end
         totalAvailableStock += stock
-        local maxAttempts = math.min(stock, maxBuys - bought)
+        -- Limit mỗi loại: không mua quá perTypeLimit seed của 1 loại trong 1 tick
+        local typeBudget = stock
+        if perTypeLimit and perTypeLimit > 0 then
+            typeBudget = math.min(stock, perTypeLimit)
+        end
+        local maxAttempts = math.min(typeBudget, maxBuys - bought)
         local attempts = 0
         while attempts < maxAttempts and KaitunRunning do
             if shouldBlockBuy() then return bought end
@@ -892,28 +951,44 @@ local function findPlantPosition(garden)
     end
 end
 
-local function tryPlantOneSeed(garden)
+local function tryPlantOneSeed(garden, plantCounts)
     if not Config.PlantSeed.Enable then return false end
     local pos = findPlantPosition(garden)
     if not pos then return false end
 
+    -- LimitPlantSeed: nếu chưa được truyền sẵn (gọi lẻ) thì tự đếm 1 lần
+    if plantCounts == nil and type(Config.LimitPlantSeed) == "table" then
+        plantCounts = countPlantsBySeedName(garden)
+    end
+    local function limitReached(name)
+        if not plantCounts then return false end
+        local lim = getPlantLimit(name)
+        if not lim then return false end
+        return (plantCounts[name] or 0) >= lim
+    end
+    local function onPlanted(name)
+        if plantCounts then plantCounts[name] = (plantCounts[name] or 0) + 1 end
+    end
+
     local tools = getSeedToolsMap()
-    -- Ưu tiên tool đã equipped (tránh equip lại)
+    -- Ưu tiên tool đã equipped (tránh equip lại) — ĐẮT → RẺ, skip seed đã đạt limit
     local char = LocalPlayer.Character
-    for _, entry in ipairs(ALL_SEEDS_BY_PRICE) do
-        if isSeedEnabled(Config.PlantSeed, entry.name) then
+    for _, entry in ipairs(ALL_SEEDS_BY_PRICE_DESC) do
+        if isSeedEnabled(Config.PlantSeed, entry.name) and not limitReached(entry.name) then
             local seedTool = tools[entry.name]
             if seedTool and seedTool.Parent == char then
                 pcall(function()
                     Net.Plant.PlantSeed:Fire(pos, entry.name, seedTool)
                 end)
+                onPlanted(entry.name)
                 return true
             end
         end
     end
-    -- Fallback: equip tool đầu tiên tìm thấy
-    for _, entry in ipairs(ALL_SEEDS_BY_PRICE) do
+    -- Fallback: equip tool đầu tiên tìm thấy — ĐẮT → RẺ, skip seed đã đạt limit
+    for _, entry in ipairs(ALL_SEEDS_BY_PRICE_DESC) do
         if not isSeedEnabled(Config.PlantSeed, entry.name) then continue end
+        if limitReached(entry.name) then continue end
         local seedTool = tools[entry.name]
         if not seedTool then continue end
         seedTool = equipTool(seedTool)
@@ -921,6 +996,7 @@ local function tryPlantOneSeed(garden)
         pcall(function()
             Net.Plant.PlantSeed:Fire(pos, entry.name, seedTool)
         end)
+        onPlanted(entry.name)
         return true
     end
     return false
@@ -961,10 +1037,12 @@ local function tryDeletePlants(garden)
 end
 
 local function trySprinkler(garden)
+    -- Sprinkler = "" / nil / false → TẮT, không đặt sprinkler dưới bất cứ trường hợp nào
+    if type(Config.Sprinkler) ~= "string" or Config.Sprinkler == "" then return false end
     local plotId = getPlotId(garden)
     if not plotId then return false end
+    -- Chỉ dùng đúng loại sprinkler cấu hình (không fallback sang loại khác)
     local tool = findToolByAttribute("Sprinkler", Config.Sprinkler)
-        or findToolByAttribute("Sprinkler")
     if not tool then return false end
     tool = equipTool(tool)
     if not tool then return false end
@@ -1012,6 +1090,8 @@ local function tryExpand()
 end
 
 local function tryBuyEssentials()
+    -- BuyGears = {} / nil → TẮT, không mua gear nào
+    if type(Config.BuyGears) ~= "table" or #Config.BuyGears == 0 then return end
     for _, gear in ipairs(Config.BuyGears) do
         fireRemote("gear_" .. gear, function()
             Net.GearShop.PurchaseGear:Fire(gear)
@@ -2687,8 +2767,13 @@ local function startPlantLoop()
                 if garden and not isInventoryFull() then
                     local planted = 0
                     local maxPerTick = Config.PlantAttemptsPerTick or 32
+                    -- Đếm cây theo loại 1 lần/tick (cho LimitPlantSeed), cache tăng dần khi plant
+                    local plantCounts = nil
+                    if type(Config.LimitPlantSeed) == "table" then
+                        plantCounts = countPlantsBySeedName(garden)
+                    end
                     for _ = 1, maxPerTick do
-                        if not tryPlantOneSeed(garden) then break end
+                        if not tryPlantOneSeed(garden, plantCounts) then break end
                         planted += 1
                     end
                     if planted > 0 then
@@ -2783,7 +2868,9 @@ local function startMaintenanceLoop()
             if garden and not WorldSeedSnatcher.claiming then
                 if os.clock() - State.lastWater >= 45 then
                     if Config.AutoWater ~= false then tryWater(garden) end
-                    trySprinkler(garden)
+                    if type(Config.Sprinkler) == "string" and Config.Sprinkler ~= "" then
+                        trySprinkler(garden)
+                    end
                     State.lastWater = os.clock()
                 end
                 if os.clock() - (State.lastExtras or 0) >= 60 then
