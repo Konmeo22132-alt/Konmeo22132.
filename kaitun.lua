@@ -130,7 +130,9 @@ local DEFAULT_CONFIG = {
 
     PetFinder = {
         Enable = true,
-        Pet = buildPetToggles({ "Owl" }),
+        -- Deer = pet tăng TỐC ĐỘ GROW (đòn bẩy số 1 của top1 script: stack 3-4x Deer →
+        -- cây lớn nhanh → cycle harvest ngắn → snowball). Săn Deer ưu tiên hàng đầu.
+        Pet = buildPetToggles({ "Deer" }),
         HopCooldown = 45,
         MoneyWhenHop = 50000000,
     },
@@ -150,8 +152,14 @@ local DEFAULT_CONFIG = {
     PlantAttemptsPerCycle = 48,
     Sprinkler = "Common Sprinkler",
     AutoWater = true,
+    -- FillGardenMode: khi vườn còn slot trống nhưng mọi seed đã đạt LimitPlantSeed,
+    -- VẪN trồng seed đắt nhất đang có để fill kín 100% slot (reinvest như top1, không idle).
+    -- false = tôn trọng tuyệt đối LimitPlantSeed (có thể để slot trống).
+    FillGardenMode = true,
     StackSpacing = 1.2,
-    StackMaxPlants = 64,
+    -- Số cây tối đa script cố nhét vào vườn (top1 chạy 300-400+). Tăng từ 64 → 200 để
+    -- scale throughput. Tự giảm nếu placement fail (vườn nhỏ). Tune theo plot expansion.
+    StackMaxPlants = 200,
     BuyLoopInterval = 1,
     PlantLoopInterval = 0.05,
     HarvestLoopInterval = 0.1,
@@ -1019,34 +1027,49 @@ local function tryPlantOneSeed(garden, plantCounts)
     end
 
     local tools = getSeedToolsMap()
-    -- Ưu tiên tool đã equipped (tránh equip lại) — ĐẮT → RẺ, skip seed đã đạt limit
     local char = LocalPlayer.Character
-    for _, entry in ipairs(ALL_SEEDS_BY_PRICE_DESC) do
-        if isSeedEnabled(Config.PlantSeed, entry.name) and not limitReached(entry.name) then
-            local seedTool = tools[entry.name]
-            if seedTool and seedTool.Parent == char then
-                pcall(function()
-                    Net.Plant.PlantSeed:Fire(pos, entry.name, seedTool)
-                end)
-                onPlanted(entry.name)
-                return true
+
+    -- 1 lượt thử trồng: duyệt ĐẮT → RẺ, ưu tiên seed giá trị cao.
+    -- ignoreLimit=false → tôn trọng LimitPlantSeed (lượt thường).
+    -- ignoreLimit=true  → FillGardenMode: bỏ qua limit để FILL KÍN slot trống bằng
+    --   seed đắt nhất đang có (reinvest như top1: vườn còn chỗ là trồng tiếp, không idle).
+    local function attemptPlant(ignoreLimit)
+        -- Ưu tiên tool đã equipped (tránh equip lại)
+        for _, entry in ipairs(ALL_SEEDS_BY_PRICE_DESC) do
+            if isSeedEnabled(Config.PlantSeed, entry.name)
+                and (ignoreLimit or not limitReached(entry.name)) then
+                local seedTool = tools[entry.name]
+                if seedTool and seedTool.Parent == char then
+                    pcall(function()
+                        Net.Plant.PlantSeed:Fire(pos, entry.name, seedTool)
+                    end)
+                    onPlanted(entry.name)
+                    return true
+                end
             end
         end
+        -- Fallback: equip tool đầu tiên tìm thấy
+        for _, entry in ipairs(ALL_SEEDS_BY_PRICE_DESC) do
+            if not isSeedEnabled(Config.PlantSeed, entry.name) then continue end
+            if not ignoreLimit and limitReached(entry.name) then continue end
+            local seedTool = tools[entry.name]
+            if not seedTool then continue end
+            seedTool = equipTool(seedTool)
+            if not seedTool then continue end
+            pcall(function()
+                Net.Plant.PlantSeed:Fire(pos, entry.name, seedTool)
+            end)
+            onPlanted(entry.name)
+            return true
+        end
+        return false
     end
-    -- Fallback: equip tool đầu tiên tìm thấy — ĐẮT → RẺ, skip seed đã đạt limit
-    for _, entry in ipairs(ALL_SEEDS_BY_PRICE_DESC) do
-        if not isSeedEnabled(Config.PlantSeed, entry.name) then continue end
-        if limitReached(entry.name) then continue end
-        local seedTool = tools[entry.name]
-        if not seedTool then continue end
-        seedTool = equipTool(seedTool)
-        if not seedTool then continue end
-        pcall(function()
-            Net.Plant.PlantSeed:Fire(pos, entry.name, seedTool)
-        end)
-        onPlanted(entry.name)
-        return true
-    end
+
+    -- Lượt 1: tôn trọng limit (giữ tỉ lệ, tránh tràn seed rác rẻ)
+    if attemptPlant(false) then return true end
+    -- Lượt 2: FillGardenMode — vườn còn slot trống nhưng mọi seed đã đạt limit →
+    -- vẫn trồng seed đắt nhất đang có để KHÔNG bỏ trống slot (đòn bẩy scale của top1).
+    if Config.FillGardenMode ~= false and attemptPlant(true) then return true end
     return false
 end
 
@@ -1684,12 +1707,15 @@ local function countOwnedPets()
 end
 
 local function tryPetManagement()
-    if Config.AutoUpgradePetSlot and countOwnedPets() >= 2 then
+    -- Nâng pet slot QUYẾT LIỆT (top1 nâng tới 5 slot để stack Deer). Fire khi có >=1 pet;
+    -- remote tự no-op nếu hết tiền / đã max. Cooldown 30s để liên tục mở slot khi đủ tiền.
+    if Config.AutoUpgradePetSlot and countOwnedPets() >= 1 then
         fireRemote("petslot", function()
             Net.Pets.RequestPurchasePetSlot:Fire()
-        end, 60)
+        end, 30)
     end
     if Config.AutoEquipPet then
+        -- Equip pet grow-boost (Deer). Equip lại định kỳ để pet mới săn được cũng vào slot.
         local equipName = getOwnedFinderPet() or getActiveFinderPet()
         if equipName then
             fireRemote("equip_" .. equipName, function()
