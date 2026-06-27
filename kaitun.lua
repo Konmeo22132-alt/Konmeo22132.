@@ -56,8 +56,10 @@ local function buildSeedToggles(enabledNames)
     for _, entry in ipairs(SEED_CATALOG) do
         map[entry.name] = set[entry.name] == true
     end
-    map.Gold = false
-    map.Rainbow = false
+    -- Gold/Rainbow không nằm trong SEED_CATALOG (chỉ dùng cho GiftMail.Seed),
+    -- nên honor theo list user truyền (mặc định false nếu không liệt kê).
+    map.Gold = set["Gold"] == true
+    map.Rainbow = set["Rainbow"] == true
     return map
 end
 
@@ -71,6 +73,24 @@ local function buildPetToggles(enabledNames)
         map[name] = set[name] == true
     end
     return map
+end
+
+-- True nếu t là mảng string (format gọn: {"Carrot","Bamboo"}). Phân biệt với map toggle.
+local function isArrayStrings(t)
+    if type(t) ~= "table" then return false end
+    local n = 0
+    for _, v in ipairs(t) do
+        if type(v) ~= "string" then return false end
+        n = n + 1
+    end
+    return n > 0
+end
+
+local function toSeedMap(v)
+    return isArrayStrings(v) and buildSeedToggles(v) or v
+end
+local function toPetMap(v)
+    return isArrayStrings(v) and buildPetToggles(v) or v
 end
 
 local DEFAULT_CONFIG = {
@@ -128,6 +148,14 @@ local DEFAULT_CONFIG = {
         HarvestTimeout = 60,   -- giây, chờ harvest carrot
     },
 
+    -- Redeem code tự động 1 LẦN sau khi tutorial xong (lưu trong Surge.json).
+    -- TEAMGREENBEAN → nhận seed Green Bean (crop giá trị cao + multi-harvest + hay ra
+    -- mutation Gold/Rainbow = dòng tiền lớn sớm, đúng flow top1).
+    RedeemCodes = {
+        Enable = true,
+        Codes = { "TEAMGREENBEAN" },
+    },
+
     PetFinder = {
         Enable = true,
         -- Deer = pet tăng TỐC ĐỘ GROW (đòn bẩy số 1 của top1 script: stack 3-4x Deer →
@@ -137,7 +165,9 @@ local DEFAULT_CONFIG = {
         MoneyWhenHop = 50000000,
     },
 
-    BuyGears = { "Common Sprinkler", "Common Watering Can" },
+    -- Ưu tiên Uncommon Sprinkler (10k) — tier cao hơn = fruit weight lớn hơn = cây to hơn
+    -- (đòn bẩy size của top1). Common Sprinkler chỉ là fallback khi chưa đủ tiền.
+    BuyGears = { "Uncommon Sprinkler", "Common Sprinkler", "Common Watering Can" },
     MaxBuysPerCycle = 50,
     MaxBuysPerTick = 25,
     -- Giới hạn số seed tối đa mua MỖI LOẠI trong 1 tick (tránh tràn seed rác rẻ như Carrot/Tulip).
@@ -150,7 +180,9 @@ local DEFAULT_CONFIG = {
     MaxInventoryTools = 83,
     HarvestInterval = 1,
     PlantAttemptsPerCycle = 48,
-    Sprinkler = "Common Sprinkler",
+    -- Sprinkler tier cao = fruit weight lớn = cây to. Uncommon (10k) > Common (2k).
+    -- Script tự fallback xuống Common khi chưa đủ tiền mua Uncommon.
+    Sprinkler = "Uncommon Sprinkler",
     AutoWater = true,
     -- FillGardenMode: khi vườn còn slot trống nhưng mọi seed đã đạt LimitPlantSeed,
     -- VẪN trồng seed đắt nhất đang có để fill kín 100% slot (reinvest như top1, không idle).
@@ -235,6 +267,33 @@ local Config = cloneTable(DEFAULT_CONFIG)
 if type(getgenv().KaitunConfig) == "table" then
     deepMerge(Config, getgenv().KaitunConfig)
 end
+
+-- Chấp nhận format gọn: BuySeed = { "Carrot", "Bamboo" } thay vì
+-- BuySeed = { Enable=true, Seed = { ["Carrot"]=true, ["Bamboo"]=true } }.
+-- Tự chuyển array string → toggle map (chạy trước normalizePetFinderConfig).
+local function normalizeListConfig()
+    -- BuySeed / PlantSeed: có thể là array string, hoặc { Enable=, Seed=array }
+    for _, key in ipairs({ "BuySeed", "PlantSeed" }) do
+        local sec = Config[key]
+        if isArrayStrings(sec) then
+            Config[key] = { Enable = true, Seed = buildSeedToggles(sec) }
+        elseif type(sec) == "table" then
+            sec.Seed = toSeedMap(sec.Seed)
+            if sec.Seed == nil then sec.Seed = buildSeedToggles({}) end
+        end
+    end
+    -- GiftMail.Seed / GiftMail.Pet
+    local gm = Config.GiftMail
+    if type(gm) == "table" then
+        gm.Seed = toSeedMap(gm.Seed)
+        gm.Pet = toPetMap(gm.Pet)
+    end
+    -- PetFinder.Pet (array string → map)
+    if type(Config.PetFinder) == "table" then
+        Config.PetFinder.Pet = toPetMap(Config.PetFinder.Pet)
+    end
+end
+normalizeListConfig()
 
 local function normalizePetFinderConfig()
     local pf = Config.PetFinder
@@ -1114,8 +1173,12 @@ local function trySprinkler(garden)
     if type(Config.Sprinkler) ~= "string" or Config.Sprinkler == "" then return false end
     local plotId = getPlotId(garden)
     if not plotId then return false end
-    -- Chỉ dùng đúng loại sprinkler cấu hình (không fallback sang loại khác)
+    -- Ưu tiên tier cấu hình (vd Uncommon); nếu chưa có trong inventory (chưa đủ tiền mua)
+    -- → fallback xuống Common Sprinkler để vườn vẫn được boost sớm.
     local tool = findToolByAttribute("Sprinkler", Config.Sprinkler)
+    if not tool and Config.Sprinkler ~= "Common Sprinkler" then
+        tool = findToolByAttribute("Sprinkler", "Common Sprinkler")
+    end
     if not tool then return false end
     tool = equipTool(tool)
     if not tool then return false end
@@ -1872,6 +1935,42 @@ local function markTutorialDoneInFile()
     data[key].tutorial = true
     data[key].doneAt = os.time()
     saveTutorialFile()
+end
+
+-- Redeem code storage (cùng Surge.json, 1 lần/code)
+local function isCodeRedeemed(code)
+    local data = loadTutorialFile()
+    local acc = data[getAccountKey()]
+    if type(acc) ~= "table" then return false end
+    if type(acc.redeemedCodes) ~= "table" then return false end
+    return acc.redeemedCodes[code] == true
+end
+
+local function markCodeRedeemed(code)
+    local data = loadTutorialFile()
+    local key = getAccountKey()
+    if type(data[key]) ~= "table" then data[key] = {} end
+    if type(data[key].redeemedCodes) ~= "table" then data[key].redeemedCodes = {} end
+    data[key].redeemedCodes[code] = true
+    saveTutorialFile()
+end
+
+-- Redeem các code trong Config.RedeemCodes.Codes (1 lần/code). Gọi sau tutorial.
+local function tryRedeemCodes()
+    if not Config.RedeemCodes or not Config.RedeemCodes.Enable then return end
+    local codes = Config.RedeemCodes.Codes
+    if type(codes) ~= "table" then return end
+    for _, code in ipairs(codes) do
+        if type(code) == "string" and #code > 0 and not isCodeRedeemed(code) then
+            local ok = fireRemote("redeem_" .. code, function()
+                Net.Settings.SubmitCode:Fire(code)
+            end, 5)
+            if ok then
+                markCodeRedeemed(code)
+                log(("Redeemed code: %s"):format(code))
+            end
+        end
+    end
 end
 
 -- Persist gold/rainbow seed count qua re-execute (lưu chung Surge.json)
@@ -3133,6 +3232,7 @@ while KaitunRunning do
     -- Start farm loops SAU khi tutorial done (chỉ 1 lần)
     if not FarmLoopsStarted then
         FarmLoopsStarted = true
+        tryRedeemCodes()
         log("Starting farm loops (buy/plant/harvest/sell/maintenance)")
         startBuyLoop()
         startPlantLoop()
