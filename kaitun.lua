@@ -240,6 +240,10 @@ local DEFAULT_CONFIG = {
     LowGraphics = true,
     UseFFlags = true,
     HideGarden3D = true,
+    -- "reparent" (default): chuyển visual meshes của plant ra folder nil → KHÔNG render
+    -- (transparency=1 vẫn tốn draw call → đó là lý do FPS 0 dù đã ẩn). An toàn vì chỉ移
+    -- part visual, giữ logic (Hitbox/ProximityPrompt/tag) lại. "transparency" = mode cũ.
+    HideGarden3DMode = "reparent",
     ShowUI = true,
     UIUpdateInterval = 1,
     InvScanInterval = 3,
@@ -424,6 +428,10 @@ local PerfState = {
     hideConn = nil,
     hideSweepTask = nil,
     lastHideSweep = 0,
+    -- Reparent mode: chuyển visual meshes ra folder nil để cắt draw call (FPS fix)
+    reparented = {},      -- [part] = oldParent
+    visualTrash = nil,    -- Folder parent=nil chứa visual parts đã移
+    reparentConn = nil,
 }
 local UICache = {
     inv = nil,
@@ -1384,24 +1392,33 @@ local function touchPartWithCharacter(part, goal)
 end
 
 -- Fire ProximityPrompt "CLAIM" trên world seed (gold/rainbow collect bằng prompt, KHÔNG phải touch).
--- Tìm prompt trên part hoặc model cha, fire qua fireproximityprompt (bypass line-of-sight).
+-- Tìm prompt trên part HOẶC mọi ancestor (thường prompt nằm ở model root, không phải mesh).
 local function fireWorldSeedPrompt(part)
     if not part or not part.Parent then return false end
-    local prompt = part:FindFirstChildWhichIsA("ProximityPrompt", true)
-    if not prompt and part.Parent then
-        prompt = part.Parent:FindFirstChildWhichIsA("ProximityPrompt", true)
+    local prompt
+    local node = part
+    for _ = 1, 6 do
+        if not node then break end
+        prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
+        if prompt then break end
+        node = node.Parent
+        if node == workspace or node == nil then break end
     end
     if not prompt or not prompt.Enabled then return false end
     local hold = (prompt.HoldDuration and prompt.HoldDuration > 0) and prompt.HoldDuration or 0
-    pcall(function()
-        if fireproximityprompt then
-            fireproximityprompt(prompt, hold)
-        else
-            prompt:InputHoldBegin()
-            if hold > 0 then task.wait(hold) end
-            prompt:InputHoldEnd()
-        end
-    end)
+    -- Fire nhiều lần (1 lượt đôi khi bị server reject do chưa kịp replicate vị trí).
+    for _ = 1, 3 do
+        pcall(function()
+            if fireproximityprompt then
+                fireproximityprompt(prompt, hold)
+            else
+                prompt:InputHoldBegin()
+                if hold > 0 then task.wait(hold) end
+                prompt:InputHoldEnd()
+            end
+        end)
+        task.wait(0.05)
+    end
     return true
 end
 
@@ -1432,6 +1449,8 @@ local function snatchWorldSeedTarget(target)
         local pos = part:IsA("BasePart") and part.Position or part:GetPivot().Position
         local goal = pos + Vector3.new(0, 2, 0)
         touchPartWithCharacter(part, goal)
+        -- Chờ 1 tick cho CFrame replicate trước khi fire prompt (server check khoảng cách).
+        RunService.Heartbeat:Wait()
         -- Collect thật qua ProximityPrompt CLAIM (touch chỉ là fallback)
         local firedPrompt = fireWorldSeedPrompt(part)
         if not promptLogged then
@@ -2539,8 +2558,49 @@ local function restoreVisualInstance(inst, saved)
     end
 end
 
+-- ── Reparent mode (FPS fix): chuyển visual meshes ra khỏi render pipeline ──────
+-- Transparency=1 vẫn tốn draw call → 37k plant mesh = FPS 0. Reparent ra folder nil
+-- cắt hoàn toàn draw call. Chỉ移 part VISUAL (giữ Hitbox/prompt/tag lại để farm chạy).
+local function isLogicPart(part)
+    if not part then return false end
+    local name = part.Name:lower()
+    if name:find("hitbox") or name:find("prompt") or name:find("trigger") then return true end
+    if part:FindFirstChildWhichIsA("ProximityPrompt", true) then return true end
+    if CollectionService:GetTags(part)[1] then return true end
+    return false
+end
+
+local function reparentVisual(inst)
+    if not inst or not inst.Parent then return end
+    if not inst:IsA("BasePart") then return end
+    if isLogicPart(inst) then return end
+    if PerfState.reparented[inst] then return end
+    if not PerfState.visualTrash then
+        PerfState.visualTrash = Instance.new("Folder")
+        PerfState.visualTrash.Name = "SurgeVisualTrash"
+    end
+    PerfState.reparented[inst] = inst.Parent
+    inst.Parent = PerfState.visualTrash
+end
+
+local function reparentVisualFolder(visual)
+    for _, desc in ipairs(visual:GetDescendants()) do
+        reparentVisual(desc)
+    end
+end
+
+local function restoreAllReparented()
+    for part, oldParent in pairs(PerfState.reparented) do
+        if part and oldParent and oldParent.Parent then
+            pcall(function() part.Parent = oldParent end)
+        end
+    end
+    PerfState.reparented = {}
+end
+
 local function sweepHideAllGardenPlants()
     if not PerfState.hideGarden3D then return end
+    local useReparent = (Config.HideGarden3DMode ~= "transparency")
     for _, garden in Gardens:GetChildren() do
         local plants = garden:FindFirstChild("Plants")
         if plants then
@@ -2549,7 +2609,11 @@ local function sweepHideAllGardenPlants()
                 -- Skip plant đã hide (đã có flag) → tránh lặp lại work
                 if not plant:GetAttribute("SurgeHidden") then
                     for _, desc in plant:GetDescendants() do
-                        hideVisualInstance(desc)
+                        if useReparent then
+                            reparentVisual(desc)
+                        else
+                            hideVisualInstance(desc)
+                        end
                     end
                     plant:SetAttribute("SurgeHidden", true)
                 end
@@ -2557,9 +2621,13 @@ local function sweepHideAllGardenPlants()
         end
         local visual = garden:FindFirstChild("Visual")
         if visual then
-            for _, desc in visual:GetDescendants() do
-                if desc:IsA("BasePart") and desc.Name:lower():find("plant") then
-                    hideVisualInstance(desc)
+            if useReparent then
+                reparentVisualFolder(visual)
+            else
+                for _, desc in visual:GetDescendants() do
+                    if desc:IsA("BasePart") and desc.Name:lower():find("plant") then
+                        hideVisualInstance(desc)
+                    end
                 end
             end
         end
@@ -2568,10 +2636,15 @@ end
 
 local function enableHideGarden3D()
     PerfState.hideGarden3D = true
+    local useReparent = (Config.HideGarden3DMode ~= "transparency")
     sweepHideAllGardenPlants()
     if PerfState.hideConn then PerfState.hideConn:Disconnect() end
     PerfState.hideConn = Gardens.DescendantAdded:Connect(function(inst)
-        if PerfState.hideGarden3D and isPlantVisual(inst) then
+        if not PerfState.hideGarden3D then return end
+        if not isPlantVisual(inst) then return end
+        if useReparent then
+            reparentVisual(inst)
+        else
             hideVisualInstance(inst)
         end
     end)
@@ -2600,6 +2673,8 @@ local function disableHideGarden3D()
         end
     end
     PerfState.hiddenParts = {}
+    -- Restore visual parts đã reparent ra trash folder
+    restoreAllReparented()
 end
 
 local stopKaitun
@@ -2716,7 +2791,13 @@ local function countWorldPlantsCached()
 end
 
 local function countHiddenParts()
-    return PerfState.hiddenCount or 0
+    local n = PerfState.hiddenCount or 0
+    if PerfState.reparented then
+        local c = 0
+        for _ in pairs(PerfState.reparented) do c = c + 1 end
+        n = n + c
+    end
+    return n
 end
 
 local function onFlag(label, active)
