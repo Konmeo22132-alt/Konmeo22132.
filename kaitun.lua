@@ -2800,10 +2800,6 @@ local function countHiddenParts()
     return n
 end
 
-local function onFlag(label, active)
-    return label .. (active and " ON" or " OFF")
-end
-
 local function buildDashboardText()
     local counts = scanInventoryCached()
     local garden = getMyGardenCached()
@@ -2814,39 +2810,46 @@ local function buildDashboardText()
     local sincePlant = math.floor(now - (State.lastPlant or 0))
     local sinceHarvest = math.floor(now - (State.lastHarvest or 0))
     local sinceSell = math.floor(now - (State.lastSell or 0))
+    local dim = '<font color="#7a8090">'
+    local off = '</font>'
+    local gold = '<font color="#FFD84A">'
+    local green = '<font color="#7ED957">'
+    local red = '<font color="#FF6B6B">'
+    local phaseColor = (State.phase == "seed_snatch" and gold)
+        or (State.phase == "hop" and red)
+        or (State.phase == "tutorial" and green)
+        or '<font color="#9aa0ad">'
+    local function flagTxt(label, on)
+        return string.format('<font color="#%s">%s %s</font>', on and "7ED957" or "5a5f6a", label, on and "ON" or "OFF")
+    end
     return table.concat({
-        "FPS " .. PerfState.currentFps .. "  |  cap " .. Config.FpsCap,
-        onFlag("FFlags", PerfState.fflagsOn) .. "  |  " .. onFlag("LowGFX", PerfState.lowGfxOn) .. "  |  " .. onFlag("Hide3D", PerfState.hideGarden3D)
-            .. (Config.BambooFarmMode and "  |  🎋Bamboo" or ""),
-        "────────────────────────",
-        "Phase: " .. State.phase .. (State.tutorialPhase and State.tutorialPhase ~= "" and (" [" .. State.tutorialPhase .. "]") or ""),
-        "Buy " .. sinceBuy .. "s | Plant " .. sincePlant .. "s | Harv " .. sinceHarvest .. "s",
-        "Sell " .. sinceSell .. "s ago  |  loops: parallel",
-        "Tools: " .. getToolCountCached() .. "/" .. (Config.MaxInventoryTools or 83)
-            .. "  |  fruit " .. getFruitCount() .. "/" .. getMaxFruitCapacity(),
-        "£" .. fmtMoney(getPlayerSheckles()) .. "  |  " .. getMovementMode() .. " mode",
-        "Garden: " .. (garden and garden.Name or "—") .. "  |  Night: " .. tostring(NightVal.Value),
-        "Pet: " .. activePet .. (ownsActive and " ✓" or " ✗")
-            .. "  |  finder: " .. (isPetFinderEnabled() and "ON" or "OFF"),
-        "Gold seed: " .. (State.goldSeedCollected or 0) .. "  |  Rainbow seed: " .. (State.rainbowSeedCollected or 0),
-        "────────────────────────",
-        "Inv seed:" .. counts.Seeds .. "  pet:" .. counts.Pets .. "  egg:" .. counts.Eggs,
-        "    fruit:" .. counts.Fruits .. "  gear:" .. counts.Gear .. "  total:" .. counts.Total,
-        "World plants: " .. countWorldPlantsCached() .. "  hidden: " .. countHiddenParts(),
-        "[RightShift] hide  |  [STOP] quit  |  3D/GFX/FF toggles",
+        dim .. "Buy" .. off .. "  " .. sinceBuy .. "s  " .. dim .. "Plant" .. off .. " " .. sincePlant .. "s  " .. dim .. "Harv" .. off .. " " .. sinceHarvest .. "s",
+        dim .. "Sell" .. off .. " " .. sinceSell .. "s  " .. dim .. "Tools" .. off .. " " .. getToolCountCached() .. "/" .. (Config.MaxInventoryTools or 83),
+        dim .. "Fruit" .. off .. " " .. getFruitCount() .. "/" .. getMaxFruitCapacity() .. "  " .. dim .. "Mode" .. off .. " " .. getMovementMode(),
+        "",
+        gold .. "£" .. fmtMoney(getPlayerSheckles()) .. off,
+        "",
+        dim .. "Phase" .. off .. " " .. phaseColor .. State.phase .. (State.tutorialPhase and State.tutorialPhase ~= "" and (" [" .. State.tutorialPhase .. "]") or "") .. off,
+        dim .. "Garden" .. off .. " " .. (garden and garden.Name or "—") .. "  " .. dim .. "Night" .. off .. " " .. tostring(NightVal.Value),
+        dim .. "Pet" .. off .. " " .. activePet .. (ownsActive and " ✓" or " ✗") .. "  " .. dim .. "Finder" .. off .. " " .. (isPetFinderEnabled() and "ON" or "OFF"),
+        dim .. "Gold" .. off .. " " .. (State.goldSeedCollected or 0) .. "  " .. dim .. "Rainbow" .. off .. " " .. (State.rainbowSeedCollected or 0),
+        "",
+        flagTxt("FF", PerfState.fflagsOn) .. "  " .. flagTxt("GFX", PerfState.lowGfxOn) .. "  " .. flagTxt("3D", PerfState.hideGarden3D)
+            .. (Config.BambooFarmMode and "  🎋" or ""),
+        dim .. "World" .. off .. " " .. countWorldPlantsCached() .. "  " .. dim .. "Hidden" .. off .. " " .. countHiddenParts(),
+        dim .. "FPS" .. off .. " " .. PerfState.currentFps .. "/" .. Config.FpsCap,
     }, "\n")
 end
 
 local function styleToggleBtn(btn, active)
-    btn.BackgroundColor3 = active and Color3.fromRGB(55, 110, 70) or Color3.fromRGB(45, 48, 58)
-    btn.TextColor3 = active and Color3.fromRGB(210, 255, 220) or Color3.fromRGB(170, 175, 185)
+    btn.BackgroundColor3 = active and Color3.fromRGB(46, 92, 58) or Color3.fromRGB(34, 37, 46)
+    btn.TextColor3 = active and Color3.fromRGB(210, 255, 220) or Color3.fromRGB(150, 156, 168)
 end
 
 local function makeToggle(parent, text, x, active, callback)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.fromOffset(44, 22)
-    btn.Position = UDim2.fromOffset(x, 6)
-    btn.BackgroundColor3 = Color3.fromRGB(45, 48, 58)
+    btn.Size = UDim2.fromOffset(46, 24)
+    btn.Position = UDim2.fromOffset(x, 7)
     btn.BorderSizePixel = 0
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 11
@@ -2854,16 +2857,27 @@ local function makeToggle(parent, text, x, active, callback)
     btn.AutoButtonColor = false
     btn.Parent = parent
     local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 5)
+    c.CornerRadius = UDim.new(0, 6)
     c.Parent = btn
+    local st = Instance.new("UIStroke")
+    st.Thickness = 1
+    st.Color = Color3.fromRGB(60, 65, 78)
+    st.Transparency = 0.2
+    st.Parent = btn
     styleToggleBtn(btn, active)
+    btn:SetAttribute("Active", active)
+    btn.MouseEnter:Connect(function()
+        if not btn:GetAttribute("Active") then btn.BackgroundColor3 = Color3.fromRGB(44, 48, 60) end
+    end)
+    btn.MouseLeave:Connect(function()
+        styleToggleBtn(btn, btn:GetAttribute("Active"))
+    end)
     btn.MouseButton1Click:Connect(function()
         local next = not btn:GetAttribute("Active")
         btn:SetAttribute("Active", next)
         styleToggleBtn(btn, next)
         callback(next)
     end)
-    btn:SetAttribute("Active", active)
     return btn
 end
 
@@ -2881,39 +2895,58 @@ local function createKaitunUI()
 
     local panel = Instance.new("Frame")
     panel.Name = "Panel"
-    panel.Size = UDim2.fromOffset(318, 248)
-    panel.Position = UDim2.new(1, -328, 0, 8)
-    panel.BackgroundColor3 = Color3.fromRGB(14, 15, 18)
-    panel.BackgroundTransparency = 0.08
+    panel.Size = UDim2.fromOffset(332, 272)
+    panel.Position = UDim2.new(1, -344, 0, 10)
+    panel.BackgroundColor3 = Color3.fromRGB(16, 18, 23)
+    panel.BackgroundTransparency = 0.06
     panel.BorderSizePixel = 0
     panel.Active = true
     panel.Parent = sg
 
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 10)
+    corner.CornerRadius = UDim.new(0, 12)
     corner.Parent = panel
 
     local stroke = Instance.new("UIStroke")
     stroke.Color = Color3.fromRGB(126, 217, 87)
     stroke.Thickness = 1
-    stroke.Transparency = 0.45
+    stroke.Transparency = 0.55
     stroke.Parent = panel
 
+    -- Header bar (dải accent trên cùng)
+    local headerBar = Instance.new("Frame")
+    headerBar.Size = UDim2.new(1, 0, 0, 36)
+    headerBar.Position = UDim2.fromOffset(0, 0)
+    headerBar.BackgroundColor3 = Color3.fromRGB(22, 26, 33)
+    headerBar.BorderSizePixel = 0
+    headerBar.Parent = panel
+    local hbc = Instance.new("UICorner")
+    hbc.CornerRadius = UDim.new(0, 12)
+    hbc.Parent = headerBar
+    -- Che góc dưới header để tạo đường phân cách sạch
+    local hbcut = Instance.new("Frame")
+    hbcut.Size = UDim2.new(1, 0, 0, 12)
+    hbcut.Position = UDim2.fromOffset(0, 24)
+    hbcut.BackgroundColor3 = Color3.fromRGB(22, 26, 33)
+    hbcut.BorderSizePixel = 0
+    hbcut.Parent = headerBar
+
     local header = Instance.new("TextLabel")
-    header.Size = UDim2.new(1, -130, 0, 28)
-    header.Position = UDim2.fromOffset(10, 4)
+    header.Size = UDim2.new(1, -150, 0, 36)
+    header.Position = UDim2.fromOffset(12, 0)
     header.BackgroundTransparency = 1
     header.Font = Enum.Font.GothamBold
-    header.TextSize = 14
+    header.TextSize = 15
     header.TextXAlignment = Enum.TextXAlignment.Left
     header.TextColor3 = Color3.fromRGB(126, 217, 87)
-    header.Text = "SURGE HUB"
+    header.RichText = true
+    header.Text = '<font color="#7ED957">SURGE</font> <font color="#cdd6f4">HUB</font>'
     header.Parent = panel
 
     local stopBtn = Instance.new("TextButton")
-    stopBtn.Size = UDim2.fromOffset(44, 22)
-    stopBtn.Position = UDim2.fromOffset(118, 6)
-    stopBtn.BackgroundColor3 = Color3.fromRGB(120, 40, 45)
+    stopBtn.Size = UDim2.fromOffset(50, 24)
+    stopBtn.Position = UDim2.fromOffset(120, 6)
+    stopBtn.BackgroundColor3 = Color3.fromRGB(110, 38, 44)
     stopBtn.BorderSizePixel = 0
     stopBtn.Font = Enum.Font.GothamBold
     stopBtn.TextSize = 11
@@ -2922,34 +2955,36 @@ local function createKaitunUI()
     stopBtn.AutoButtonColor = false
     stopBtn.Parent = panel
     local stopCorner = Instance.new("UICorner")
-    stopCorner.CornerRadius = UDim.new(0, 5)
+    stopCorner.CornerRadius = UDim.new(0, 6)
     stopCorner.Parent = stopBtn
+    stopBtn.MouseEnter:Connect(function() stopBtn.BackgroundColor3 = Color3.fromRGB(140, 48, 54) end)
+    stopBtn.MouseLeave:Connect(function() stopBtn.BackgroundColor3 = Color3.fromRGB(110, 38, 44) end)
     stopBtn.MouseButton1Click:Connect(function()
         stopBtn.Active = false
         stopKaitun()
     end)
 
-    makeToggle(panel, "3D", 168, Config.HideGarden3D, function(v)
+    makeToggle(panel, "3D", 178, Config.HideGarden3D, function(v)
         if v then enableHideGarden3D() else disableHideGarden3D() end
     end)
-    makeToggle(panel, "GFX", 218, Config.LowGraphics, function(v)
+    makeToggle(panel, "GFX", 230, Config.LowGraphics, function(v)
         if v then applyLowGraphics() else clearLowGraphics() end
     end)
-    makeToggle(panel, "FF", 268, Config.UseFFlags, function(v)
+    makeToggle(panel, "FF", 282, Config.UseFFlags, function(v)
         if v then applyFFlags() else clearFFlags() end
     end)
 
     local body = Instance.new("TextLabel")
     body.Name = "Body"
-    body.Size = UDim2.new(1, -16, 1, -38)
-    body.Position = UDim2.fromOffset(8, 34)
+    body.Size = UDim2.new(1, -20, 1, -48)
+    body.Position = UDim2.fromOffset(10, 42)
     body.BackgroundTransparency = 1
     body.Font = Enum.Font.Code
     body.TextSize = 13
-    body.TextColor3 = Color3.fromRGB(215, 220, 230)
+    body.TextColor3 = Color3.fromRGB(220, 226, 236)
     body.TextXAlignment = Enum.TextXAlignment.Left
     body.TextYAlignment = Enum.TextYAlignment.Top
-    body.TextWrapped = true
+    body.RichText = true
     body.Text = "Loading..."
     body.Parent = panel
 
@@ -2985,6 +3020,24 @@ local function createKaitunUI()
     Gui.Screen = sg
     Gui.Panel = panel
     Gui.Body = body
+
+    -- Fade-in nhẹ (1 lần, không loop → không tốn FPS)
+    pcall(function()
+        local TweenService = game:GetService("TweenService")
+        panel.BackgroundTransparency = 1
+        for _, d in ipairs({ headerBar, header, stopBtn, body }) do
+            if d:IsA("TextLabel") or d:IsA("TextButton") then
+                d.TextTransparency = 1
+            end
+        end
+        local ti = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        TweenService:Create(panel, ti, { BackgroundTransparency = 0.06 }):Play()
+        for _, d in ipairs({ headerBar, header, stopBtn, body }) do
+            if d:IsA("TextLabel") or d:IsA("TextButton") then
+                TweenService:Create(d, ti, { TextTransparency = 0 }):Play()
+            end
+        end
+    end)
 end
 
 local function updateUI()
