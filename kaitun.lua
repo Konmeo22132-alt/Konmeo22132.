@@ -3203,6 +3203,59 @@ sendWebhookEmbed(
 State.startTime = os.time()
 State.lastRejoinNotified = os.time()
 
+-- ── In-game notification (style "found a Gold Seed") ─────────────────────────
+-- Clone template Notification_UI từ ReplicatedStorage, parent vào TopNotification.Frame,
+-- fade text in/out. Dùng RichText để tô màu chữ như thông báo Gold Seed.
+local function showInGameNotification(richText, holdSec)
+    task.spawn(function()
+        holdSec = holdSec or 5
+        local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui", 5)
+        if not pg then return end
+        local top = pg:FindFirstChild("TopNotification") or pg:WaitForChild("TopNotification", 5)
+        if not top then return end
+        local frame = top:FindFirstChild("Frame") or top:WaitForChild("Frame", 5)
+        if not frame then return end
+        local assets = ReplicatedStorage:FindFirstChild("Assets")
+        local tmpl = assets and assets:FindFirstChild("NotificationUI")
+        tmpl = tmpl and tmpl:FindFirstChild("Notification_UI")
+        if not tmpl then return end
+
+        local clone = tmpl:Clone()
+        clone:SetAttribute("NotificationTimer", holdSec + 1)
+        local content = clone:FindFirstChild("Content")
+        local tl = content and content:FindFirstChildWhichIsA("TextLabel", true)
+        if not tl then clone:Destroy() return end
+        tl.RichText = true
+        tl.Text = richText
+        tl.TextTransparency = 1
+        tl.TextStrokeTransparency = 1
+        local img = clone:FindFirstChildWhichIsA("ImageLabel")
+        if img then img.ImageTransparency = 1 end  -- text-only, ẩn ảnh nền
+        clone.Parent = frame
+
+        pcall(function()
+            local sfx = game:GetService("SoundService"):FindFirstChild("SFX")
+            sfx = sfx and sfx:FindFirstChild("Notification")
+            if sfx then sfx:Play() end
+        end)
+
+        local TweenService = game:GetService("TweenService")
+        local tiIn = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        TweenService:Create(tl, tiIn, { TextTransparency = 0, TextStrokeTransparency = 0 }):Play()
+        task.wait(holdSec)
+        local tiOut = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+        TweenService:Create(tl, tiOut, { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+        task.wait(0.45)
+        clone:Destroy()
+    end)
+end
+
+-- 2 thông báo khởi động (giống style Gold Seed): Surge Hub + Discord
+showInGameNotification('<font color="rgb(255,220,70)">Surge Hub</font>', 5)
+task.delay(1.2, function()
+    showInGameNotification('<font color="rgb(85,140,255)">https://discord.gg/G4aDYRwnzb</font>', 6)
+end)
+
 -- Load gold/rainbow seed count đã persist từ file (chống reset khi re-execute)
 do
     local ok, g, r = pcall(loadSeedCountsFromFile)
