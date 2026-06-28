@@ -1293,9 +1293,21 @@ local function tryOpenEgg()
     return false
 end
 
+-- Luau: max 200 local registers per chunk — gom helpers vào scope riêng
+local WorldSeedSnatcher
+local startWorldSeedSnatcher, huntFinderPetOnce, findWildPetTargets, getActiveFinderPet, getOwnedFinderPet
+local getPetFinderQueue, playerOwnsPet, tryPetManagement, tryGiftMailOnce
+local tryAutoTutorialSendPet, isTutorialDoneInFile, loadSeedCountsFromFile, saveSeedCountsToFile, markTutorialDoneInFile, tryRedeemCodes
+local shouldHopForPet, hopServer, tryStayInBase, formatUptime, sendStatusWebhook
+local sendWebhookEmbed, stopKaitun, syncKaitunGenv
+local createKaitunUI, startFpsTracker, startUIUpdater, updateUI, applyOptimizations, startAntiAfk, showInGameNotification
+local enableHideGarden3D, disableHideGarden3D, applyFFlags, clearFFlags, applyLowGraphics, clearLowGraphics, isPlantVisual
+
+do
+
 -- ── World seeds (Gold / Rainbow) — highest priority snatcher ────────────────
 
-local WorldSeedSnatcher = {
+WorldSeedSnatcher = {
     claiming = false,
     seen = {},
     locs = nil,
@@ -1422,11 +1434,6 @@ local function fireWorldSeedPrompt(part)
     return true
 end
 
--- Forward declaration: sendWebhookEmbed được định nghĩa sau nhưng snatchWorldSeedTarget dùng trước
-local sendWebhookEmbed
-local saveSeedCountsToFile  -- định nghĩa sau, dùng trong snatchWorldSeedTarget
-local loadSeedCountsFromFile
-
 local function snatchWorldSeedTarget(target)
     if not target or WorldSeedSnatcher.claiming then return false end
     WorldSeedSnatcher.claiming = true
@@ -1543,7 +1550,7 @@ local function onWorldSeedSpawn(part)
     end)
 end
 
-local function startWorldSeedSnatcher()
+startWorldSeedSnatcher = function()
     if not isWorldSeedCollectEnabled() then return end
 
     task.spawn(function()
@@ -1650,7 +1657,7 @@ local function triggerHoldPrompt(prompt)
     return ok
 end
 
-local function findWildPetTargets(petFilter)
+findWildPetTargets = function(petFilter)
     local targets = {}
     local folder = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("WildPetSpawns")
     if not folder then return targets end
@@ -1677,7 +1684,7 @@ local function findWildPetTargets(petFilter)
     return targets
 end
 
-local function playerOwnsPet(petName)
+playerOwnsPet = function(petName)
     local function scan(container)
         if not container then return false end
         for _, item in container:GetChildren() do
@@ -1689,7 +1696,7 @@ local function playerOwnsPet(petName)
     return scan(LocalPlayer.Backpack) or scan(LocalPlayer.Character)
 end
 
-local function getPetFinderQueue()
+getPetFinderQueue = function()
     local list = {}
     if not isPetFinderEnabled() then return list end
     for _, name in ipairs(PET_CATALOG) do
@@ -1700,13 +1707,13 @@ local function getPetFinderQueue()
     return list
 end
 
-local function getActiveFinderPet()
+getActiveFinderPet = function()
     for _, name in ipairs(getPetFinderQueue()) do
         if not playerOwnsPet(name) then return name end
     end
 end
 
-local function getOwnedFinderPet()
+getOwnedFinderPet = function()
     for _, name in ipairs(getPetFinderQueue()) do
         if playerOwnsPet(name) then return name end
     end
@@ -1790,7 +1797,7 @@ local function countOwnedPets()
     return n
 end
 
-local function tryPetManagement()
+tryPetManagement = function()
     -- Nâng pet slot QUYẾT LIỆT (top1 nâng tới 5 slot để stack Deer). Fire khi có >=1 pet;
     -- remote tự no-op nếu hết tiền / đã max. Cooldown 30s để liên tục mở slot khi đủ tiền.
     if Config.AutoUpgradePetSlot and countOwnedPets() >= 1 then
@@ -1810,7 +1817,7 @@ local function tryPetManagement()
     tryOpenEgg()
 end
 
-local function huntFinderPetOnce()
+huntFinderPetOnce = function()
     if not isPetFinderEnabled() then return false end
     local petName = getActiveFinderPet()
     if not petName then return false end
@@ -1864,7 +1871,7 @@ local function hasAnyGiftPetEnabled()
     return false
 end
 
-local function tryGiftMailOnce()
+tryGiftMailOnce = function()
     local mail = Config.GiftMail
     if type(mail) ~= "table" or mail.Enable ~= true then return false end
     local uid = resolveGiftRecipientId()
@@ -1939,14 +1946,14 @@ local function getAccountKey()
     return LocalPlayer.Name .. "_" .. tostring(LocalPlayer.UserId)
 end
 
-local function isTutorialDoneInFile()
+isTutorialDoneInFile = function()
     local data = loadTutorialFile()
     local acc = data[getAccountKey()]
     if type(acc) ~= "table" then return false end
     return acc.tutorial == true
 end
 
-local function markTutorialDoneInFile()
+markTutorialDoneInFile = function()
     local data = loadTutorialFile()
     local key = getAccountKey()
     if type(data[key]) ~= "table" then data[key] = {} end
@@ -1975,7 +1982,7 @@ local function markCodeRedeemed(code)
 end
 
 -- Redeem các code trong Config.RedeemCodes.Codes (1 lần/code). Gọi sau tutorial.
-local function tryRedeemCodes()
+tryRedeemCodes = function()
     if not Config.RedeemCodes or not Config.RedeemCodes.Enable then return end
     local codes = Config.RedeemCodes.Codes
     if type(codes) ~= "table" then return end
@@ -2161,7 +2168,7 @@ local function runAutoTutorialFlow()
     return true
 end
 
-local function tryAutoTutorialSendPet()
+tryAutoTutorialSendPet = function()
     if State.tutorialDone then return true end
     local tut = Config.Tutorial
     if type(tut) ~= "table" or tut.Enable ~= true then
@@ -2208,7 +2215,7 @@ end
 
 -- ── Server hop ──────────────────────────────────────────────────────────────
 
-local function shouldHopForPet()
+shouldHopForPet = function()
     if not Config.HopServer then return false end  -- chặn hop khi HopServer = false
     if not isPetFinderEnabled() then return false end
     local petName = getActiveFinderPet()
@@ -2219,7 +2226,7 @@ local function shouldHopForPet()
     return #targets == 0
 end
 
-local function hopServer()
+hopServer = function()
     if not Config.HopServer then
         log("Hop blocked by config (HopServer = false)")
         State.lastHop = os.clock()  -- tránh re-trigger liên tục
@@ -2250,7 +2257,7 @@ end
 
 -- ── Stay base + webhook + optimization ──────────────────────────────────────
 
-local function tryStayInBase()
+tryStayInBase = function()
     if not Config.StayInBase or TravelActive then return end
     local home = getHomePosition()
     local HRP = getHRP()
@@ -2305,7 +2312,7 @@ sendWebhookEmbed = function(title, description, color, fields)
 end
 
 -- Tính uptime dạng "Xh Ym Zs" hoặc "Xm Zs"
-local function formatUptime(seconds)
+formatUptime = function(seconds)
     seconds = math.floor(seconds or 0)
     local h = math.floor(seconds / 3600)
     local m = math.floor((seconds % 3600) / 60)
@@ -2346,7 +2353,7 @@ local function countGoldRainbowSeeds()
 end
 
 -- Webhook status định kỳ: tài khoản, tiền, tổng seed, số pet, gold/rainbow, uptime (EMBED)
-local function sendStatusWebhook()
+sendStatusWebhook = function()
     local sheckles = getPlayerSheckles()
     local totalSeeds = countTotalSeeds()
     local petCount = countOwnedPets()
@@ -2397,7 +2404,7 @@ local FFLAG_LIST = {
     { "FIntMaterialQuality", "0" },
 }
 
-local function applyFFlags()
+applyFFlags = function()
     if not setfflag then return end
     for _, entry in ipairs(FFLAG_LIST) do
         local name, val = entry[1], entry[2]
@@ -2407,14 +2414,13 @@ local function applyFFlags()
     PerfState.fflagsOn = true
 end
 
-local function clearFFlags()
+clearFFlags = function()
     PerfState.fflagsOn = false
 end
 
 local SavedLighting = {}
-local isPlantVisual  -- forward declare (defined bên dưới)
 
-local function applyLowGraphics()
+applyLowGraphics = function()
     pcall(function()
         SavedLighting.GlobalShadows = Lighting.GlobalShadows
         SavedLighting.Technology = Lighting.Technology
@@ -2475,7 +2481,7 @@ local function applyLowGraphics()
     PerfState.lowGfxOn = true
 end
 
-local function clearLowGraphics()
+clearLowGraphics = function()
     pcall(function()
         if SavedLighting.GlobalShadows ~= nil then
             Lighting.GlobalShadows = SavedLighting.GlobalShadows
@@ -2634,7 +2640,7 @@ local function sweepHideAllGardenPlants()
     end
 end
 
-local function enableHideGarden3D()
+enableHideGarden3D = function()
     PerfState.hideGarden3D = true
     local useReparent = (Config.HideGarden3DMode ~= "transparency")
     sweepHideAllGardenPlants()
@@ -2657,7 +2663,7 @@ local function enableHideGarden3D()
     end)
 end
 
-local function disableHideGarden3D()
+disableHideGarden3D = function()
     PerfState.hideGarden3D = false
     if PerfState.hideConn then
         PerfState.hideConn:Disconnect()
@@ -2677,8 +2683,7 @@ local function disableHideGarden3D()
     restoreAllReparented()
 end
 
-local stopKaitun
-local function syncKaitunGenv()
+syncKaitunGenv = function()
     local g = getgenv and getgenv() or _G
     g.KaitunRunning = KaitunRunning
     g.KaitunState = State
@@ -2881,7 +2886,7 @@ local function makeToggle(parent, text, x, active, callback)
     return btn
 end
 
-local function createKaitunUI()
+createKaitunUI = function()
     if Config.ShowUI == false then return end
     local pg = LocalPlayer:WaitForChild("PlayerGui")
     local old = pg:FindFirstChild("KaitunDash")
@@ -3040,12 +3045,12 @@ local function createKaitunUI()
     end)
 end
 
-local function updateUI()
+updateUI = function()
     if not Gui.Body then return end
     Gui.Body.Text = buildDashboardText()
 end
 
-local function startFpsTracker()
+startFpsTracker = function()
     local frames, elapsed = 0, 0
     RunService.Heartbeat:Connect(function(dt)
         frames += 1
@@ -3057,7 +3062,7 @@ local function startFpsTracker()
     end)
 end
 
-local function startUIUpdater()
+startUIUpdater = function()
     task.spawn(function()
         while KaitunRunning do
             if Gui.Body and Gui.visible then updateUI() end
@@ -3066,14 +3071,14 @@ local function startUIUpdater()
     end)
 end
 
-local function applyOptimizations()
+applyOptimizations = function()
     if setfpscap and Config.FpsCap then pcall(setfpscap, Config.FpsCap) end
     if Config.UseFFlags then applyFFlags() end
     if Config.LowGraphics then applyLowGraphics() end
     if Config.HideGarden3D then enableHideGarden3D() end
 end
 
-local function startAntiAfk()
+startAntiAfk = function()
     if not Config.AntiAfk then return end
     pcall(function() LocalPlayer:SetAttribute("AntiAfkIdleOverride", 999999) end)
     LocalPlayer.Idled:Connect(function()
@@ -3083,7 +3088,7 @@ local function startAntiAfk()
             vu:ClickButton2(Vector2.new())
         end)
     end)
-end
+end -- scope block (Luau register limit)
 
 -- ── Main kaitun loop ────────────────────────────────────────────────────────
 
@@ -3259,7 +3264,7 @@ State.lastRejoinNotified = os.time()
 -- ── In-game notification (style "found a Gold Seed") ─────────────────────────
 -- Clone template Notification_UI từ ReplicatedStorage, parent vào TopNotification.Frame,
 -- fade text in/out. Dùng RichText để tô màu chữ như thông báo Gold Seed.
-local function showInGameNotification(richText, holdSec)
+showInGameNotification = function(richText, holdSec)
     task.spawn(function()
         holdSec = holdSec or 5
         local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui", 5)
